@@ -1,6 +1,7 @@
 use bevy::color::palettes::css::*;
 use bevy::prelude::*;
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -31,7 +32,7 @@ const BOARD_HEIGHT: usize = 8;
 
 const BACK_COLOR_DATA: &[Srgba] = &[WHITE, ORANGE, YELLOW];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Back {
     Undef,
     PlayerOne,
@@ -66,7 +67,7 @@ const TILE_COLOR_DATA: &[(Srgba, Srgba, usize)] = &[
     (LIGHT_BLUE, BLUE, 27),
 ];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tile {
     Undef,
     Red,
@@ -107,8 +108,28 @@ pub struct UiCard {
 #[derive(Component)]
 pub struct UiBack {
     back: Back,
-    row: usize,
-    column: usize,
+}
+
+#[derive(Clone, Eq, PartialEq)]
+struct Priority {
+    distance: usize,
+    player: Back,
+}
+
+impl PartialOrd for Priority {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
+impl Ord for Priority {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.distance.cmp(&other.distance).reverse() {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => self.player.cmp(&other.player).reverse(),
+        }
+    }
 }
 
 fn populate_cards(
@@ -138,11 +159,7 @@ fn populate_cards(
                      column: usize|
      -> (Entity, Entity) {
         let ui_card = UiCard { tile, row, column };
-        let ui_back = UiBack {
-            back: Back::Undef,
-            row,
-            column,
-        };
+        let ui_back = UiBack { back: Back::Undef };
 
         let tile_index: usize = ui_card.tile.clone().into();
         let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
@@ -263,19 +280,10 @@ fn click_cards(
     }
 }
 
-fn populate_neighbors(
-    ui_backs: Query<(&UiBack, Entity)>,
-    ui_cards: Query<(&UiCard, Entity)>,
-    mut game: ResMut<Game>,
-) {
+fn populate_neighbors(ui_cards: Query<(&UiCard, Entity)>, mut game: ResMut<Game>) {
     let mut coord_to_cards = HashMap::new();
     for (ui_card, card) in ui_cards.iter() {
         coord_to_cards.insert((ui_card.row, ui_card.column), card);
-    }
-
-    let mut coord_to_backs = HashMap::new();
-    for (ui_back, back) in ui_backs.iter() {
-        coord_to_backs.insert((ui_back.row, ui_back.column), back);
     }
 
     let mut card_to_neighbors = HashMap::new();
@@ -299,7 +307,7 @@ fn populate_neighbors(
     game.card_to_neighbors = card_to_neighbors;
 }
 
-fn update_backs(mut ui_backs: Query<&mut UiBack>, game: Res<Game>) {
+fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game: Res<Game>) {
     assert!(game.player_one_card.is_some());
     assert!(game.player_two_card.is_some());
     assert!(!game.card_to_neighbors.is_empty());
@@ -310,21 +318,51 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, game: Res<Game>) {
         ui_back.back = Back::Undef;
     }
 
-    {
-        let ui_card = game.player_two_card.unwrap();
-        let ui_back = game.card_to_backs.get(&ui_card).unwrap();
-        let mut ui_back = ui_backs.get_mut(*ui_back).unwrap();
-        ui_back.back = Back::PlayerOne;
-    }
+    let player_one_card = game.player_one_card.unwrap();
+    let player_two_card = game.player_two_card.unwrap();
 
-    {
-        let ui_card = game.player_two_card.unwrap();
-        let ui_back = game.card_to_backs.get(&ui_card).unwrap();
-        let mut ui_back = ui_backs.get_mut(*ui_back).unwrap();
-        ui_back.back = Back::PlayerTwo;
-    }
+    let mut done = HashSet::new();
+    let mut queue = priority_queue::PriorityQueue::new();
 
-    
+    queue.push(
+        player_one_card,
+        Priority {
+            distance: 0,
+            player: Back::PlayerOne,
+        },
+    );
+    queue.push(
+        player_two_card,
+        Priority {
+            distance: 0,
+            player: Back::PlayerTwo,
+        },
+    );
+
+    while let Some((current_card, current_priority)) = queue.pop() {
+        assert!(!done.contains(&current_card));
+
+        let current_tile = ui_cards.get(current_card).unwrap().tile.clone();
+        let next_cards = game.card_to_neighbors.get(&current_card).unwrap();
+        for next_card in next_cards {
+            if done.contains(next_card) {
+                continue;
+            }
+            let next_tile = ui_cards.get(*next_card).unwrap().tile.clone();
+            if next_tile != current_tile {
+                continue;
+            }
+            let mut next_priority = current_priority.clone();
+            next_priority.distance += 1;
+            queue.push(*next_card, next_priority);
+        }
+
+        let current_back = game.card_to_backs.get(&current_card).unwrap();
+        let mut current_back = ui_backs.get_mut(*current_back).unwrap();
+        current_back.back = current_priority.player.clone();
+
+        done.insert(current_card);
+    }
 }
 
 fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>) {

@@ -1480,6 +1480,7 @@ dependencies = [
  "env_logger",
  "log",
  "pollster",
+ "priority-queue",
  "wgpu",
 ]
 
@@ -3550,6 +3551,17 @@ checksum = "061c1221631e079b26479d25bbf2275bfe5917ae8419cd7e34f13bfc2aa7539a"
 dependencies = [
  "proc-macro2",
  "syn",
+]
+
+[[package]]
+name = "priority-queue"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5676d703dda103cbb035b653a9f11448c0a7216c7926bd35fcb5865475d0c970"
+dependencies = [
+ "autocfg",
+ "equivalent",
+ "indexmap",
 ]
 
 [[package]]
