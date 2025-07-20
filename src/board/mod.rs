@@ -2,6 +2,7 @@ use bevy::color::palettes::css::*;
 use bevy::prelude::*;
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -11,6 +12,7 @@ struct Game {
     player_two_card: Option<Entity>,
     card_to_neighbors: HashMap<Entity, HashSet<Entity>>,
     card_to_backs: HashMap<Entity, Entity>,
+    player_to_counts: BTreeMap<Player, usize>,
 }
 
 pub struct BoardPlugin;
@@ -21,7 +23,14 @@ impl Plugin for BoardPlugin {
         app.add_systems(PostStartup, populate_neighbors);
         app.add_systems(
             Update,
-            (click_cards, update_backs, animate_backs, animate_cards).chain(),
+            (
+                click_cards,
+                update_backs,
+                animate_backs,
+                animate_status,
+                animate_cards,
+            )
+                .chain(),
         );
         app.init_resource::<Game>();
     }
@@ -30,31 +39,31 @@ impl Plugin for BoardPlugin {
 const BOARD_WIDTH: usize = 12;
 const BOARD_HEIGHT: usize = 8;
 
-const BACK_COLOR_DATA: &[Srgba] = &[WHITE, ORANGE, YELLOW];
+const PLAYER_COLOR_DATA: &[Srgba] = &[WHITE, ORANGE, YELLOW];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Back {
+pub enum Player {
     Undef,
-    PlayerOne,
-    PlayerTwo,
+    One,
+    Two,
 }
 
-impl Into<usize> for Back {
+impl Into<usize> for Player {
     fn into(self) -> usize {
         match self {
             Self::Undef => 0usize,
-            Self::PlayerOne => 1,
-            Self::PlayerTwo => 2,
+            Self::One => 1,
+            Self::Two => 2,
         }
     }
 }
 
-impl From<usize> for Back {
+impl From<usize> for Player {
     fn from(index: usize) -> Self {
-        match index % BACK_COLOR_DATA.len() {
+        match index % PLAYER_COLOR_DATA.len() {
             0 => Self::Undef,
-            1 => Self::PlayerOne,
-            2 => Self::PlayerTwo,
+            1 => Self::One,
+            2 => Self::Two,
             _ => unreachable!(),
         }
     }
@@ -107,13 +116,16 @@ pub struct UiCard {
 
 #[derive(Component)]
 pub struct UiBack {
-    back: Back,
+    player: Player,
 }
+
+#[derive(Component)]
+pub struct UiStatus;
 
 #[derive(Clone, Eq, PartialEq)]
 struct Priority {
     distance: usize,
-    player: Back,
+    player: Player,
 }
 
 impl PartialOrd for Priority {
@@ -159,7 +171,9 @@ fn populate_cards(
                      column: usize|
      -> (Entity, Entity) {
         let ui_card = UiCard { tile, row, column };
-        let ui_back = UiBack { back: Back::Undef };
+        let ui_back = UiBack {
+            player: Player::Undef,
+        };
 
         let tile_index: usize = ui_card.tile.clone().into();
         let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
@@ -231,24 +245,24 @@ fn populate_cards(
     let mut body_frame = commands.spawn(Node {
         width: Val::Percent(100.0),
         height: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
+        flex_direction: FlexDirection::Column,
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
         ..default()
     });
 
     body_frame.with_children(|parent| {
-        let mut seed: usize = 0xabff1745;
-        for column in 0..BOARD_WIDTH {
+        let mut seed: usize = 0xabff1aab45;
+        for row in 0..BOARD_HEIGHT {
             parent
                 .spawn(Node {
-                    flex_direction: FlexDirection::Column,
+                    flex_direction: FlexDirection::Row,
                     align_items: AlignItems::FlexStart,
                     justify_content: JustifyContent::FlexStart,
                     ..default()
                 })
                 .with_children(|parent| {
-                    for row in 0..BOARD_HEIGHT {
+                    for column in 0..BOARD_WIDTH {
                         let tile = Tile::from(seed);
                         seed ^= 0x9e3779b9 + (seed << 6) + (seed >> 2);
                         let (card_entity, back_entity) = make_card(parent, tile, row, column);
@@ -262,6 +276,16 @@ fn populate_cards(
                     }
                 });
         }
+
+        parent.spawn((
+            UiStatus,
+            Node {
+                margin: UiRect::all(Val::Px(20.0)),
+                ..default()
+            },
+            Text::new("status"),
+            TextColor(WHITE.into()),
+        ));
     });
 }
 
@@ -315,7 +339,7 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
     assert!(game.card_to_backs.len() == game.card_to_neighbors.len());
 
     for mut ui_back in ui_backs.iter_mut() {
-        ui_back.back = Back::Undef;
+        ui_back.player = Player::Undef;
     }
 
     let player_one_card = game.player_one_card.unwrap();
@@ -328,14 +352,14 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
         player_one_card,
         Priority {
             distance: 0,
-            player: Back::PlayerOne,
+            player: Player::One,
         },
     );
     queue.push(
         player_two_card,
         Priority {
             distance: 0,
-            player: Back::PlayerTwo,
+            player: Player::Two,
         },
     );
 
@@ -359,18 +383,29 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
 
         let current_back = game.card_to_backs.get(&current_card).unwrap();
         let mut current_back = ui_backs.get_mut(*current_back).unwrap();
-        current_back.back = current_priority.player.clone();
+        current_back.player = current_priority.player.clone();
 
         done.insert(current_card);
     }
 }
 
-fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>) {
+fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>, mut game: ResMut<Game>) {
+    let mut player_to_counts = BTreeMap::new();
     for (ui_back, mut back_color) in ui_backs.iter_mut() {
-        let back_index: usize = ui_back.back.clone().into();
-        let bg_color = BACK_COLOR_DATA[back_index].clone();
+        let player_index: usize = ui_back.player.clone().into();
+        let bg_color = PLAYER_COLOR_DATA[player_index].clone();
         *back_color = bg_color.into();
+        if !player_to_counts.contains_key(&ui_back.player) {
+            player_to_counts.insert(ui_back.player.clone(), 0);
+        }
+        *player_to_counts.get_mut(&ui_back.player).unwrap() += 1;
     }
+    game.player_to_counts = player_to_counts;
+}
+
+fn animate_status(mut status: Single<&mut Text, With<UiStatus>>, game: Res<Game>) {
+    let label = format!("!!!! {:?} !!!!", game.player_to_counts);
+    **status = label.into();
 }
 
 fn animate_cards(
