@@ -17,10 +17,21 @@ use std::collections::HashSet;
 struct Game {
     player_one_card: Option<Entity>,
     player_two_card: Option<Entity>,
+    select_red_card: Option<Entity>,
+    select_green_card: Option<Entity>,
+    select_blue_card: Option<Entity>,
     card_to_neighbors: HashMap<Entity, HashSet<Entity>>,
     card_to_backs: HashMap<Entity, Entity>,
     player_to_counts: BTreeMap<Player, usize>,
     player_to_playable_tiles: BTreeMap<Player, BTreeSet<Tile>>,
+}
+
+#[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
+enum GameState {
+    #[default]
+    Init,
+    WaitingForMove(Player),
+    SelectedMove(Player),
 }
 
 pub struct BoardPlugin;
@@ -42,6 +53,7 @@ impl Plugin for BoardPlugin {
                 .chain(),
         );
         app.init_resource::<Game>();
+        app.init_state::<GameState>();
     }
 }
 
@@ -58,6 +70,12 @@ pub struct UiCard {
 #[derive(Component)]
 pub struct UiBack {
     player: Player,
+}
+
+#[derive(Component)]
+pub struct UiSelect {
+    tile: Tile,
+    playable: bool,
 }
 
 #[derive(Component)]
@@ -183,6 +201,75 @@ fn populate_cards(
         (card_entity.unwrap(), back.id())
     };
 
+    let make_select = |parent: &mut ChildSpawnerCommands, tile: Tile| -> Entity {
+        let ui_select = UiSelect {
+            tile,
+            playable: false,
+        };
+
+        let tile_index: usize = ui_select.tile.clone().into();
+        let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
+        let bg_color: Color = bg_color.into();
+        let fg_color: Color = fg_color.into();
+
+        let mut card_entity = None;
+        let mut back = parent.spawn((Node {
+            width: Val::Px(70.0),
+            height: Val::Px(70.0),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            margin: UiRect::all(Val::Px(0.0)),
+            border: UiRect::all(Val::Px(0.0)),
+            padding: UiRect::all(Val::Px(0.0)),
+            ..default()
+        },));
+
+        back.with_children(|parent| {
+            let mut card = parent.spawn((
+                ui_select,
+                Button,
+                Node {
+                    width: Val::Px(64.0),
+                    height: Val::Px(64.0),
+                    align_items: AlignItems::FlexStart,
+                    justify_content: JustifyContent::FlexStart,
+                    margin: UiRect::all(Val::Px(2.0)),
+                    border: UiRect::all(Val::Px(2.0)),
+                    ..default()
+                },
+                BackgroundColor(bg_color.clone()),
+                BorderColor(fg_color.clone()),
+                BorderRadius::all(Val::Px(8.0)),
+            ));
+
+            card.with_children(|parent| {
+                let _button = parent.spawn((
+                    ImageNode::from_atlas_image(
+                        texture.clone(),
+                        TextureAtlas {
+                            index: atlas_index,
+                            layout: atlas_layout.clone(),
+                        },
+                    )
+                    .with_color(fg_color.clone())
+                    .with_mode(NodeImageMode::Sliced(slicer.clone())),
+                    Node {
+                        width: Val::Px(64.0 - 6.0),
+                        height: Val::Px(64.0 - 6.0),
+                        margin: UiRect::all(Val::Px(0.0)),
+                        padding: UiRect::all(Val::Px(16.0)),
+                        border: UiRect::all(Val::Px(0.0)),
+                        ..default()
+                    },
+                ));
+            });
+
+            card_entity = Some(card.id());
+        });
+
+        card_entity.unwrap()
+    };
+
     let mut body_frame = commands.spawn(Node {
         width: Val::Percent(100.0),
         height: Val::Percent(100.0),
@@ -217,6 +304,22 @@ fn populate_cards(
                     }
                 });
         }
+        parent
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                margin: UiRect::top(Val::Px(10.0)),
+                ..default()
+            })
+            .with_children(|parent| {
+                let select_red_entity = make_select(parent, Tile::Red);
+                let select_green_card = make_select(parent, Tile::Green);
+                let select_blue_entity = make_select(parent, Tile::Blue);
+                game.select_red_card = Some(select_red_entity);
+                game.select_green_card = Some(select_green_card);
+                game.select_blue_card = Some(select_blue_entity);
+            });
         parent.spawn((
             UiStatus,
             Node {
@@ -231,22 +334,11 @@ fn populate_cards(
     });
 }
 
-fn click_cards(
-    mut ui_cards: Query<(&mut UiCard, &Interaction), (Changed<Interaction>, With<Button>)>,
+fn populate_neighbors(
+    ui_cards: Query<(&UiCard, Entity)>,
+    mut game: ResMut<Game>,
+    mut state: ResMut<NextState<GameState>>,
 ) {
-    for (mut ui_card, interaction) in ui_cards.iter_mut() {
-        if matches!(*interaction, Interaction::Pressed) {
-            ui_card.tile = match ui_card.tile {
-                Tile::Undef => Tile::Undef,
-                Tile::Red => Tile::Green,
-                Tile::Green => Tile::Blue,
-                Tile::Blue => Tile::Red,
-            };
-        }
-    }
-}
-
-fn populate_neighbors(ui_cards: Query<(&UiCard, Entity)>, mut game: ResMut<Game>) {
     let mut coord_to_cards = HashMap::new();
     for (ui_card, card) in ui_cards.iter() {
         coord_to_cards.insert((ui_card.row, ui_card.column), card);
@@ -269,8 +361,9 @@ fn populate_neighbors(ui_cards: Query<(&UiCard, Entity)>, mut game: ResMut<Game>
         }
         card_to_neighbors.insert(entity, neighbors);
     }
-
     game.card_to_neighbors = card_to_neighbors;
+
+    state.set(GameState::WaitingForMove(Player::One));
 }
 
 fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game: Res<Game>) {
@@ -368,10 +461,15 @@ fn update_game_stats(
     game.player_to_playable_tiles = player_to_playable_tiles;
 }
 
-fn animate_status(mut status: Single<&mut Text, With<UiStatus>>, game: Res<Game>) {
+fn animate_status(
+    mut status: Single<&mut Text, With<UiStatus>>,
+    game: Res<Game>,
+    state: Res<State<GameState>>,
+) {
+    let state = state.get();
     let label = format!(
-        "{:?}\n{:?}",
-        game.player_to_counts, game.player_to_playable_tiles,
+        "{:?} // {:?} // {:?}",
+        game.player_to_counts, game.player_to_playable_tiles, state,
     );
     **status = label.into();
 }
@@ -417,4 +515,20 @@ fn animate_cards(
             button.texture_atlas.as_mut().unwrap().index = atlas_index;
         }
     }
+}
+
+fn click_cards() {
+    // mut ui_cards: Query<(&mut UiCard, &Interaction), (Changed<Interaction>, With<Button>)>,
+    /*
+    for (mut ui_card, interaction) in ui_cards.iter_mut() {
+        if matches!(*interaction, Interaction::Pressed) {
+            ui_card.tile = match ui_card.tile {
+                Tile::Undef => Tile::Undef,
+                Tile::Red => Tile::Green,
+                Tile::Green => Tile::Blue,
+                Tile::Blue => Tile::Red,
+            };
+        }
+    }
+    */
 }

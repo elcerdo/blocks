@@ -3,7 +3,7 @@ use bevy::color::palettes::css::*;
 
 pub const PLAYER_COLOR_DATA: &[Srgba] = &[WHITE, ORANGE, YELLOW];
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Player {
     Undef,
     One,
