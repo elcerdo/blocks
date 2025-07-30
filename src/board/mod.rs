@@ -1,8 +1,15 @@
+mod player;
+mod tile;
+
+use player::{PLAYER_COLOR_DATA, Player};
+use tile::{TILE_COLOR_DATA, Tile};
+
 use bevy::color::palettes::css::*;
 use bevy::prelude::*;
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -13,6 +20,7 @@ struct Game {
     card_to_neighbors: HashMap<Entity, HashSet<Entity>>,
     card_to_backs: HashMap<Entity, Entity>,
     player_to_counts: BTreeMap<Player, usize>,
+    player_to_playable_tiles: BTreeMap<Player, BTreeSet<Tile>>,
 }
 
 pub struct BoardPlugin;
@@ -26,8 +34,9 @@ impl Plugin for BoardPlugin {
             (
                 click_cards,
                 update_backs,
-                animate_backs,
+                update_game_stats,
                 animate_status,
+                animate_backs,
                 animate_cards,
             )
                 .chain(),
@@ -38,74 +47,6 @@ impl Plugin for BoardPlugin {
 
 const BOARD_WIDTH: usize = 12;
 const BOARD_HEIGHT: usize = 8;
-
-const PLAYER_COLOR_DATA: &[Srgba] = &[WHITE, ORANGE, YELLOW];
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Player {
-    Undef,
-    One,
-    Two,
-}
-
-impl Into<usize> for Player {
-    fn into(self) -> usize {
-        match self {
-            Self::Undef => 0usize,
-            Self::One => 1,
-            Self::Two => 2,
-        }
-    }
-}
-
-impl From<usize> for Player {
-    fn from(index: usize) -> Self {
-        match index % PLAYER_COLOR_DATA.len() {
-            0 => Self::Undef,
-            1 => Self::One,
-            2 => Self::Two,
-            _ => unreachable!(),
-        }
-    }
-}
-
-const TILE_COLOR_DATA: &[(Srgba, Srgba, usize)] = &[
-    (LIGHT_GREY, BLACK, 0),
-    (PINK, RED, 25),
-    (LIGHT_GREEN, GREEN, 26),
-    (LIGHT_BLUE, BLUE, 27),
-];
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Tile {
-    Undef,
-    Red,
-    Green,
-    Blue,
-}
-
-impl Into<usize> for Tile {
-    fn into(self) -> usize {
-        match self {
-            Tile::Undef => 0usize,
-            Tile::Red => 1,
-            Tile::Green => 2,
-            Tile::Blue => 3,
-        }
-    }
-}
-
-impl From<usize> for Tile {
-    fn from(index: usize) -> Self {
-        match index % TILE_COLOR_DATA.len() {
-            0 => Tile::Undef,
-            1 => Tile::Red,
-            2 => Tile::Green,
-            3 => Tile::Blue,
-            _ => unreachable!(),
-        }
-    }
-}
 
 #[derive(Component, Clone, Debug)]
 pub struct UiCard {
@@ -276,11 +217,12 @@ fn populate_cards(
                     }
                 });
         }
-
         parent.spawn((
             UiStatus,
             Node {
-                margin: UiRect::all(Val::Px(20.0)),
+                margin: UiRect::all(Val::Px(10.0)),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
                 ..default()
             },
             Text::new("status"),
@@ -389,23 +331,57 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
     }
 }
 
-fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>, mut game: ResMut<Game>) {
+fn update_game_stats(
+    ui_backs: Query<&UiBack>,
+    ui_cards: Query<(&UiCard, Entity)>,
+    mut game: ResMut<Game>,
+) {
     let mut player_to_counts = BTreeMap::new();
-    for (ui_back, mut back_color) in ui_backs.iter_mut() {
-        let player_index: usize = ui_back.player.clone().into();
-        let bg_color = PLAYER_COLOR_DATA[player_index].clone();
-        *back_color = bg_color.into();
+    for ui_back in ui_backs.iter() {
         if !player_to_counts.contains_key(&ui_back.player) {
             player_to_counts.insert(ui_back.player.clone(), 0);
         }
         *player_to_counts.get_mut(&ui_back.player).unwrap() += 1;
     }
     game.player_to_counts = player_to_counts;
+
+    let mut player_to_playable_tiles = BTreeMap::new();
+    player_to_playable_tiles.insert(Player::One, BTreeSet::new());
+    player_to_playable_tiles.insert(Player::Two, BTreeSet::new());
+    for (ui_card, card_entity) in ui_cards.iter() {
+        let back_entity = *game.card_to_backs.get(&card_entity).unwrap();
+        let ui_back = ui_backs.get(back_entity).unwrap();
+        if let Some(playable_tiles) = player_to_playable_tiles.get_mut(&ui_back.player) {
+            assert!(ui_card.tile != Tile::Undef);
+            for card_entity_ in game.card_to_neighbors.get(&card_entity).unwrap() {
+                let card_entity_ = *card_entity_;
+                let back_entity_ = *game.card_to_backs.get(&card_entity_).unwrap();
+                let ui_card_ = ui_cards.get(card_entity_).unwrap().0;
+                let ui_back_ = ui_backs.get(back_entity_).unwrap();
+                if ui_back_.player != ui_back.player && ui_card_.tile != Tile::Undef {
+                    assert!(ui_card.tile != ui_card_.tile);
+                    playable_tiles.insert(ui_card_.tile.clone());
+                }
+            }
+        }
+    }
+    game.player_to_playable_tiles = player_to_playable_tiles;
 }
 
 fn animate_status(mut status: Single<&mut Text, With<UiStatus>>, game: Res<Game>) {
-    let label = format!("!!!! {:?} !!!!", game.player_to_counts);
+    let label = format!(
+        "{:?}\n{:?}",
+        game.player_to_counts, game.player_to_playable_tiles,
+    );
     **status = label.into();
+}
+
+fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>) {
+    for (ui_back, mut back_color) in ui_backs.iter_mut() {
+        let player_index: usize = ui_back.player.clone().into();
+        let bg_color = PLAYER_COLOR_DATA[player_index].clone();
+        *back_color = bg_color.into();
+    }
 }
 
 fn animate_cards(
