@@ -46,6 +46,7 @@ impl Plugin for BoardPlugin {
                 update_game,
                 update_selects,
                 click_selects,
+                play_selects,
                 update_backs,
                 animate_status,
                 animate_backs,
@@ -406,9 +407,9 @@ fn update_game(
 }
 
 fn update_selects(
-    state: Res<State<GameState>>,
-    game: Res<Game>,
     mut ui_selects: Query<&mut UiSelect>,
+    game: Res<Game>,
+    state: Res<State<GameState>>,
 ) {
     assert!(game.select_red_card.is_some());
     assert!(game.select_green_card.is_some());
@@ -451,6 +452,67 @@ fn click_selects(
     }
 }
 
+fn play_selects(
+    mut ui_cards: Query<&mut UiCard>,
+    game: Res<Game>,
+    state: Res<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    assert!(game.player_one_card.is_some());
+    assert!(game.player_two_card.is_some());
+    assert!(!game.card_to_neighbors.is_empty());
+    assert!(!game.card_to_backs.is_empty());
+    assert!(game.card_to_backs.len() == game.card_to_neighbors.len());
+
+    if let GameState::SelectedMove(player, tile) = state.get() {
+        let player_card = match player {
+            Player::One => game.player_one_card.unwrap(),
+            Player::Two => game.player_two_card.unwrap(),
+            _ => unreachable!(),
+        };
+
+        let mut done = HashSet::new();
+        let mut queue = priority_queue::PriorityQueue::new();
+        queue.push(
+            player_card,
+            Priority {
+                distance: 0,
+                player: player.clone(),
+            },
+        );
+        let current_tile = ui_cards.get(player_card).unwrap().tile.clone();
+        while let Some((current_card, current_priority)) = queue.pop() {
+            assert!(!done.contains(&current_card));
+
+            let next_cards = game.card_to_neighbors.get(&current_card).unwrap();
+            for next_card in next_cards {
+                if done.contains(next_card) {
+                    continue;
+                }
+                let next_tile = ui_cards.get(*next_card).unwrap().tile.clone();
+                if next_tile != current_tile {
+                    continue;
+                }
+                let mut next_priority = current_priority.clone();
+                next_priority.distance += 1;
+                queue.push(*next_card, next_priority);
+            }
+
+            let mut ui_card = ui_cards.get_mut(current_card).unwrap();
+            ui_card.tile = tile.clone();
+
+            done.insert(current_card);
+        }
+
+        let next_player = match player {
+            Player::One => Player::Two,
+            Player::Two => Player::One,
+            _ => unreachable!(),
+        };
+        next_state.set(GameState::WaitingForMove(next_player));
+    }
+}
+
 fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game: Res<Game>) {
     assert!(game.player_one_card.is_some());
     assert!(game.player_two_card.is_some());
@@ -467,7 +529,6 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
 
     let mut done = HashSet::new();
     let mut queue = priority_queue::PriorityQueue::new();
-
     queue.push(
         player_one_card,
         Priority {
@@ -482,7 +543,6 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
             player: Player::Two,
         },
     );
-
     while let Some((current_card, current_priority)) = queue.pop() {
         assert!(!done.contains(&current_card));
 
@@ -501,9 +561,9 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
             queue.push(*next_card, next_priority);
         }
 
-        let current_back = game.card_to_backs.get(&current_card).unwrap();
-        let mut current_back = ui_backs.get_mut(*current_back).unwrap();
-        current_back.player = current_priority.player.clone();
+        let ui_back = game.card_to_backs.get(&current_card).unwrap();
+        let mut ui_back = ui_backs.get_mut(*ui_back).unwrap();
+        ui_back.player = current_priority.player.clone();
 
         done.insert(current_card);
     }
