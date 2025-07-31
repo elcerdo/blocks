@@ -8,7 +8,7 @@ pub const TILE_COLOR_DATA: &[(Srgba, Srgba, usize)] = &[
     (LIGHT_BLUE, BLUE, 27),
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Tile {
     Undef,
     Red,

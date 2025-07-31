@@ -31,7 +31,7 @@ enum GameState {
     #[default]
     Init,
     WaitingForMove(Player),
-    SelectedMove(Player),
+    SelectedMove(Player, Tile),
 }
 
 pub struct BoardPlugin;
@@ -45,6 +45,7 @@ impl Plugin for BoardPlugin {
             (
                 update_game,
                 update_selects,
+                click_selects,
                 update_backs,
                 animate_status,
                 animate_backs,
@@ -338,7 +339,7 @@ fn populate_cards(
 fn populate_neighbors(
     ui_cards: Query<(&UiCard, Entity)>,
     mut game: ResMut<Game>,
-    mut state: ResMut<NextState<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     let mut coord_to_cards = HashMap::new();
     for (ui_card, card) in ui_cards.iter() {
@@ -364,7 +365,7 @@ fn populate_neighbors(
     }
     game.card_to_neighbors = card_to_neighbors;
 
-    state.set(GameState::WaitingForMove(Player::One));
+    next_state.set(GameState::WaitingForMove(Player::One));
 }
 
 fn update_game(
@@ -430,6 +431,23 @@ fn update_selects(
     for select_card in select_cards {
         let mut select_card = ui_selects.get_mut(select_card).unwrap();
         select_card.playable = playable_tiles.contains(&select_card.tile);
+    }
+}
+
+fn click_selects(
+    ui_selects: Query<(&UiSelect, &Interaction), (Changed<Interaction>, With<Button>)>,
+    state: Res<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    if let GameState::WaitingForMove(player) = state.get() {
+        for (ui_select, interaction) in ui_selects {
+            if matches!(interaction, Interaction::Pressed) {
+                next_state.set(GameState::SelectedMove(
+                    player.clone(),
+                    ui_select.tile.clone(),
+                ));
+            }
+        }
     }
 }
 
