@@ -43,12 +43,13 @@ impl Plugin for BoardPlugin {
         app.add_systems(
             Update,
             (
-                click_cards,
+                update_game,
+                update_selects,
                 update_backs,
-                update_game_stats,
                 animate_status,
                 animate_backs,
                 animate_cards,
+                animate_selects,
             )
                 .chain(),
         );
@@ -366,6 +367,72 @@ fn populate_neighbors(
     state.set(GameState::WaitingForMove(Player::One));
 }
 
+fn update_game(
+    ui_backs: Query<&UiBack>,
+    ui_cards: Query<(&UiCard, Entity)>,
+    mut game: ResMut<Game>,
+) {
+    let mut player_to_counts = BTreeMap::new();
+    for ui_back in ui_backs.iter() {
+        if !player_to_counts.contains_key(&ui_back.player) {
+            player_to_counts.insert(ui_back.player.clone(), 0);
+        }
+        *player_to_counts.get_mut(&ui_back.player).unwrap() += 1;
+    }
+    game.player_to_counts = player_to_counts;
+
+    let mut player_to_playable_tiles = BTreeMap::new();
+    player_to_playable_tiles.insert(Player::One, BTreeSet::new());
+    player_to_playable_tiles.insert(Player::Two, BTreeSet::new());
+    for (ui_card, card_entity) in ui_cards.iter() {
+        let back_entity = *game.card_to_backs.get(&card_entity).unwrap();
+        let ui_back = ui_backs.get(back_entity).unwrap();
+        if let Some(playable_tiles) = player_to_playable_tiles.get_mut(&ui_back.player) {
+            assert!(ui_card.tile != Tile::Undef);
+            for card_entity_ in game.card_to_neighbors.get(&card_entity).unwrap() {
+                let card_entity_ = *card_entity_;
+                let back_entity_ = *game.card_to_backs.get(&card_entity_).unwrap();
+                let ui_card_ = ui_cards.get(card_entity_).unwrap().0;
+                let ui_back_ = ui_backs.get(back_entity_).unwrap();
+                if ui_back_.player != ui_back.player && ui_card_.tile != Tile::Undef {
+                    assert!(ui_card.tile != ui_card_.tile);
+                    playable_tiles.insert(ui_card_.tile.clone());
+                }
+            }
+        }
+    }
+    game.player_to_playable_tiles = player_to_playable_tiles;
+}
+
+fn update_selects(
+    state: Res<State<GameState>>,
+    game: Res<Game>,
+    mut ui_selects: Query<&mut UiSelect>,
+) {
+    assert!(game.select_red_card.is_some());
+    assert!(game.select_green_card.is_some());
+    assert!(game.select_blue_card.is_some());
+
+    let playable_tiles = if let GameState::WaitingForMove(player) = state.get() {
+        match game.player_to_playable_tiles.get(player) {
+            Some(playable_tiles) => playable_tiles.clone(),
+            None => BTreeSet::new(),
+        }
+    } else {
+        BTreeSet::new()
+    };
+
+    let select_cards = [
+        game.select_red_card.unwrap(),
+        game.select_green_card.unwrap(),
+        game.select_blue_card.unwrap(),
+    ];
+    for select_card in select_cards {
+        let mut select_card = ui_selects.get_mut(select_card).unwrap();
+        select_card.playable = playable_tiles.contains(&select_card.tile);
+    }
+}
+
 fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game: Res<Game>) {
     assert!(game.player_one_card.is_some());
     assert!(game.player_two_card.is_some());
@@ -424,43 +491,6 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
     }
 }
 
-fn update_game_stats(
-    ui_backs: Query<&UiBack>,
-    ui_cards: Query<(&UiCard, Entity)>,
-    mut game: ResMut<Game>,
-) {
-    let mut player_to_counts = BTreeMap::new();
-    for ui_back in ui_backs.iter() {
-        if !player_to_counts.contains_key(&ui_back.player) {
-            player_to_counts.insert(ui_back.player.clone(), 0);
-        }
-        *player_to_counts.get_mut(&ui_back.player).unwrap() += 1;
-    }
-    game.player_to_counts = player_to_counts;
-
-    let mut player_to_playable_tiles = BTreeMap::new();
-    player_to_playable_tiles.insert(Player::One, BTreeSet::new());
-    player_to_playable_tiles.insert(Player::Two, BTreeSet::new());
-    for (ui_card, card_entity) in ui_cards.iter() {
-        let back_entity = *game.card_to_backs.get(&card_entity).unwrap();
-        let ui_back = ui_backs.get(back_entity).unwrap();
-        if let Some(playable_tiles) = player_to_playable_tiles.get_mut(&ui_back.player) {
-            assert!(ui_card.tile != Tile::Undef);
-            for card_entity_ in game.card_to_neighbors.get(&card_entity).unwrap() {
-                let card_entity_ = *card_entity_;
-                let back_entity_ = *game.card_to_backs.get(&card_entity_).unwrap();
-                let ui_card_ = ui_cards.get(card_entity_).unwrap().0;
-                let ui_back_ = ui_backs.get(back_entity_).unwrap();
-                if ui_back_.player != ui_back.player && ui_card_.tile != Tile::Undef {
-                    assert!(ui_card.tile != ui_card_.tile);
-                    playable_tiles.insert(ui_card_.tile.clone());
-                }
-            }
-        }
-    }
-    game.player_to_playable_tiles = player_to_playable_tiles;
-}
-
 fn animate_status(
     mut status: Single<&mut Text, With<UiStatus>>,
     game: Res<Game>,
@@ -483,9 +513,28 @@ fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>) {
 }
 
 fn animate_cards(
-    mut ui_cards: Query<
+    mut ui_cards: Query<(&UiCard, &Children, &mut BorderColor, &mut BackgroundColor), With<Button>>,
+    mut buttons: Query<&mut ImageNode>,
+) {
+    for (ui_card, children, mut border_color, mut back_color) in ui_cards.iter_mut() {
+        let tile_index: usize = ui_card.tile.clone().into();
+        let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
+        let bg_color: Color = bg_color.into();
+        let fg_color: Color = fg_color.into();
+        *border_color = fg_color.into();
+        *back_color = bg_color.into();
+        for child in children {
+            let mut button = buttons.get_mut(*child).unwrap();
+            button.color = fg_color;
+            button.texture_atlas.as_mut().unwrap().index = atlas_index;
+        }
+    }
+}
+
+fn animate_selects(
+    mut ui_selects: Query<
         (
-            &UiCard,
+            &UiSelect,
             &Interaction,
             &Children,
             &mut BorderColor,
@@ -498,37 +547,25 @@ fn animate_cards(
 ) {
     let time = time.elapsed().as_secs_f32();
     let strobe = Hsva::new(360.0 * time.fract(), 0.8, 1.0, 1.0);
-    for (ui_card, interaction, children, mut border_color, mut back_color) in ui_cards.iter_mut() {
-        let tile_index: usize = ui_card.tile.clone().into();
-        let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
+    for (ui_select, interaction, children, mut border_color, mut back_color) in
+        ui_selects.iter_mut()
+    {
+        let tile_index: usize = ui_select.tile.clone().into();
+        let tile_index_: usize = if ui_select.playable { tile_index } else { 0 };
+        let (_, _, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
+        let (bg_color, fg_color, _) = TILE_COLOR_DATA[tile_index_].clone();
         let bg_color: Color = bg_color.into();
-        let fg_color: Color = fg_color.into();
-        let color: Color = match interaction {
-            Interaction::Hovered => strobe.into(),
-            _ => fg_color,
+        let fg_color: Color = if ui_select.playable && matches!(interaction, Interaction::Hovered) {
+            strobe.into()
+        } else {
+            fg_color.into()
         };
-        *border_color = color.into();
+        *border_color = fg_color.into();
         *back_color = bg_color.into();
         for child in children {
             let mut button = buttons.get_mut(*child).unwrap();
-            button.color = color;
+            button.color = fg_color;
             button.texture_atlas.as_mut().unwrap().index = atlas_index;
         }
     }
-}
-
-fn click_cards() {
-    // mut ui_cards: Query<(&mut UiCard, &Interaction), (Changed<Interaction>, With<Button>)>,
-    /*
-    for (mut ui_card, interaction) in ui_cards.iter_mut() {
-        if matches!(*interaction, Interaction::Pressed) {
-            ui_card.tile = match ui_card.tile {
-                Tile::Undef => Tile::Undef,
-                Tile::Red => Tile::Green,
-                Tile::Green => Tile::Blue,
-                Tile::Blue => Tile::Red,
-            };
-        }
-    }
-    */
 }
