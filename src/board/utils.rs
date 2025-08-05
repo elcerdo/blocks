@@ -18,11 +18,14 @@ pub fn populate_board(
     mut board: ResMut<BoardResource>,
     asset_server: Res<AssetServer>,
 ) {
-    let texture = asset_server.load("textures/border_sheet.png");
-
-    let atlas_layout =
+    let texture_border = asset_server.load("textures/border_sheet.png");
+    let atlas_layout_border =
         TextureAtlasLayout::from_grid(UVec2::new(50, 50), 6, 6, Some(UVec2::splat(2)), None);
-    let atlas_layout = texture_atlas_layouts.add(atlas_layout);
+    let atlas_layout_border = texture_atlas_layouts.add(atlas_layout_border);
+
+    let texture_crown = asset_server.load("textures/crown_70x70.png");
+    let atlas_layout_crown = TextureAtlasLayout::from_grid(UVec2::new(70, 70), 1, 1, None, None);
+    let atlas_layout_crown = texture_atlas_layouts.add(atlas_layout_crown);
 
     let slicer = TextureSlicer {
         border: BorderRect::all(24.0),
@@ -42,7 +45,13 @@ pub fn populate_board(
 
     body_frame.with_children(|parent| {
         let mut seed = BOARD_SEED;
-        player_block::make_pair(parent, Player::One, Player::Undef);
+        player_block::make_pair(
+            &texture_crown,
+            &atlas_layout_crown,
+            parent,
+            Player::One,
+            Player::Undef,
+        );
         for row in 0..BOARD_HEIGHT {
             parent
                 .spawn(Node {
@@ -56,8 +65,8 @@ pub fn populate_board(
                         let tile = Tile::from(seed);
                         seed ^= 0x9e3779b9 + (seed << 6) + (seed >> 2);
                         let (card_entity, back_entity) = card_and_back::make_pair(
-                            &texture,
-                            &atlas_layout,
+                            &texture_border,
+                            &atlas_layout_border,
                             &slicer,
                             parent,
                             tile,
@@ -74,7 +83,13 @@ pub fn populate_board(
                     }
                 });
         }
-        player_block::make_pair(parent, Player::Undef, Player::Two);
+        player_block::make_pair(
+            &texture_crown,
+            &atlas_layout_crown,
+            parent,
+            Player::Undef,
+            Player::Two,
+        );
         parent
             .spawn(Node {
                 position_type: PositionType::Relative,
@@ -85,12 +100,27 @@ pub fn populate_board(
                 ..default()
             })
             .with_children(|parent| {
-                let select_red_entity =
-                    select_move::make(&texture, &atlas_layout, &slicer, parent, Tile::Red);
-                let select_green_card =
-                    select_move::make(&texture, &atlas_layout, &slicer, parent, Tile::Green);
-                let select_blue_entity =
-                    select_move::make(&texture, &atlas_layout, &slicer, parent, Tile::Blue);
+                let select_red_entity = select_move::make(
+                    &texture_border,
+                    &atlas_layout_border,
+                    &slicer,
+                    parent,
+                    Tile::Red,
+                );
+                let select_green_card = select_move::make(
+                    &texture_border,
+                    &atlas_layout_border,
+                    &slicer,
+                    parent,
+                    Tile::Green,
+                );
+                let select_blue_entity = select_move::make(
+                    &texture_border,
+                    &atlas_layout_border,
+                    &slicer,
+                    parent,
+                    Tile::Blue,
+                );
                 board.select_red_card = Some(select_red_entity);
                 board.select_green_card = Some(select_green_card);
                 board.select_blue_card = Some(select_blue_entity);

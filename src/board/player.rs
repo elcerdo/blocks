@@ -2,7 +2,7 @@ use bevy::color::Srgba;
 use bevy::color::palettes::tailwind::*;
 
 pub const PLAYER_COLOR_DATA: &[(Srgba, Srgba)] = &[
-    (GRAY_800, GRAY_200),
+    (Srgba::NONE, Srgba::NONE),
     (ORANGE_200, ORANGE_600),
     (CYAN_200, CYAN_600),
 ];

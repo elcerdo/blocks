@@ -43,8 +43,8 @@ impl Ord for Priority {
 }
 
 pub fn make_pair(
-    texture: &Handle<Image>,
-    atlas_layout: &Handle<TextureAtlasLayout>,
+    texture_border: &Handle<Image>,
+    atlas_layout_border: &Handle<TextureAtlasLayout>,
     slicer: &TextureSlicer,
     parent: &mut ChildSpawnerCommands,
     tile: Tile,
@@ -74,7 +74,7 @@ pub fn make_pair(
             padding: UiRect::all(Val::Px(0.0)),
             ..default()
         },
-        BackgroundColor(Srgba::new(0.0, 1.0, 1.0, 0.2).into()),
+        BackgroundColor::default(),
     ));
 
     back.with_children(|parent| {
@@ -98,10 +98,10 @@ pub fn make_pair(
         card.with_children(|parent| {
             let _button = parent.spawn((
                 ImageNode::from_atlas_image(
-                    texture.clone(),
+                    texture_border.clone(),
                     TextureAtlas {
                         index: atlas_index,
-                        layout: atlas_layout.clone(),
+                        layout: atlas_layout_border.clone(),
                     },
                 )
                 .with_color(fg_color.clone())
