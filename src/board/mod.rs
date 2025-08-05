@@ -5,7 +5,7 @@ mod card_and_back;
 mod debug_label;
 mod player_block;
 mod select_move;
-
+mod sound_effect;
 mod utils;
 
 use player::Player;
@@ -15,8 +15,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
-
-use log::info;
 
 use bevy::prelude::*;
 
@@ -30,6 +28,7 @@ impl Plugin for BoardPlugin {
                 debug_label::populate,
                 utils::populate_board,
                 card_and_back::compute_neighborhoods,
+                sound_effect::populate,
             )
                 .chain(),
         );
@@ -50,18 +49,26 @@ impl Plugin for BoardPlugin {
             )
                 .chain(),
         );
-        app.add_systems(OnEnter(BoardState::Victory(Player::One)), play_yeah_sfx);
-        app.add_systems(OnEnter(BoardState::Victory(Player::Two)), play_yeah_sfx);
+
+        app.add_systems(
+            OnEnter(BoardState::Victory(Player::One)),
+            sound_effect::play_yeah,
+        );
+        app.add_systems(
+            OnEnter(BoardState::Victory(Player::Two)),
+            sound_effect::play_yeah,
+        );
         app.add_systems(
             OnEnter(BoardState::ResolvingMove(Player::One)),
-            play_collision_sfx,
+            sound_effect::play_collision,
         );
         app.add_systems(
             OnEnter(BoardState::ResolvingMove(Player::Two)),
-            play_collision_sfx,
+            sound_effect::play_collision,
         );
 
         app.init_resource::<BoardResource>();
+        app.init_resource::<sound_effect::SoundEffectResource>();
         app.init_state::<BoardState>();
     }
 }
@@ -92,18 +99,4 @@ enum BoardState {
     PlayingMove(Player, Tile),
     ResolvingMove(Player),
     Victory(Player),
-}
-
-fn play_collision_sfx(mut commands: Commands, asset_server: Res<AssetServer>) {
-    info!("!!! collision !!!!");
-    let audio = asset_server.load("sounds/breakout_collision.ogg");
-    let audio = AudioPlayer::new(audio);
-    commands.spawn((audio, PlaybackSettings::ONCE));
-}
-
-fn play_yeah_sfx(mut commands: Commands, asset_server: Res<AssetServer>) {
-    info!("!!! yeah !!!!");
-    let audio = asset_server.load("sounds/yeah-7106.ogg");
-    let audio = AudioPlayer::new(audio);
-    commands.spawn((audio, PlaybackSettings::ONCE));
 }
