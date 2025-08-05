@@ -7,10 +7,11 @@ use super::BoardResource;
 use super::BoardState;
 use super::UiBack;
 use super::UiCard;
-use super::UiPlayerLabel;
 use super::UiSelect;
-use super::player::{PLAYER_COLOR_DATA, Player};
+use super::player::Player;
 use super::tile::{TILE_COLOR_DATA, Tile};
+
+use super::player_block;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -171,63 +172,6 @@ fn make_card(
     (card_entity.unwrap(), back.id())
 }
 
-fn make_player_labels(
-    parent: &mut ChildSpawnerCommands,
-    left_player: Player,
-    right_player: Player,
-) {
-    let make_label = |container: &mut EntityCommands, player: Player| {
-        let ui_player_label = UiPlayerLabel { player };
-        let index: usize = ui_player_label.player.clone().into();
-        let (color_bg, color_fg) = PLAYER_COLOR_DATA[index];
-        let color_bg: Color = color_bg.into();
-        let color_fg: Color = color_fg.into();
-        let label = match ui_player_label.player.clone() {
-            Player::One => "P1",
-            Player::Two => "P2",
-            Player::Undef => "??",
-        };
-        container.with_children(|parent| {
-            let mut div = parent.spawn((
-                Node {
-                    width: Val::Px(70.0),
-                    height: Val::Px(70.0),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                BackgroundColor(color_bg),
-            ));
-            div.with_child((
-                ui_player_label,
-                TextColor(color_fg.into()),
-                Text::new(label),
-            ));
-        });
-    };
-
-    let make_spacer = |container: &mut EntityCommands| {
-        container.with_child(Node {
-            width: Val::Px(70.0 * (BOARD_WIDTH - 2) as f32),
-            height: Val::Px(70.0),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            ..default()
-        });
-    };
-
-    let mut container = parent.spawn(Node {
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::FlexStart,
-        justify_content: JustifyContent::SpaceBetween,
-        ..default()
-    });
-
-    make_label(&mut container, left_player);
-    make_spacer(&mut container);
-    make_label(&mut container, right_player);
-}
-
 pub fn populate_items(
     mut commands: Commands,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
@@ -258,7 +202,7 @@ pub fn populate_items(
 
     body_frame.with_children(|parent| {
         let mut seed = BOARD_SEED;
-        make_player_labels(parent, Player::One, Player::Undef);
+        player_block::make_pair(parent, Player::One, Player::Undef);
         for row in 0..BOARD_HEIGHT {
             parent
                 .spawn(Node {
@@ -283,7 +227,7 @@ pub fn populate_items(
                     }
                 });
         }
-        make_player_labels(parent, Player::Undef, Player::Two);
+        player_block::make_pair(parent, Player::Undef, Player::Two);
         parent
             .spawn(Node {
                 position_type: PositionType::Relative,

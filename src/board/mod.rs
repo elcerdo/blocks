@@ -1,4 +1,5 @@
 mod debug_label;
+mod player_block;
 
 mod anim;
 mod make;
@@ -32,7 +33,7 @@ impl Plugin for BoardPlugin {
                 click_selects,
                 play_selects,
                 update_backs,
-                anim::animate_player_labels,
+                player_block::animate,
                 debug_label::animate,
                 anim::animate_backs,
                 anim::animate_cards,
@@ -65,11 +66,6 @@ pub struct UiBack {
 pub struct UiSelect {
     pub tile: Tile,
     pub playable: bool,
-}
-
-#[derive(Component)]
-pub struct UiPlayerLabel {
-    pub player: Player,
 }
 
 #[derive(Resource, Default)]
