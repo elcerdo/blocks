@@ -75,7 +75,7 @@ impl Plugin for BoardPlugin {
 
 const BOARD_WIDTH: usize = 14;
 const BOARD_HEIGHT: usize = 7;
-const BOARD_SEED: usize = 0xabf8f1afb5;
+const BOARD_SEED: usize = 0xabf8f1af;
 
 #[derive(Resource, Default)]
 struct BoardResource {
