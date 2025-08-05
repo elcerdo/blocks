@@ -2,3 +2,4 @@ target
 prospero.png
 snapshot*.png
 *.obj
+./Cargo.lock
