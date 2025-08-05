@@ -26,8 +26,8 @@ pub fn animate(
 ) {
     let state = state.get();
     let label = format!(
-        "{:?}\n{:?}\n{:?}",
-        board.player_to_counts, board.player_to_playable_tiles, state,
+        "{} moves\n{:?}\n{:?}\n{:?}",
+        board.num_resolved_moves, board.player_to_counts, board.player_to_playable_tiles, state,
     );
     **status = label.into();
 }

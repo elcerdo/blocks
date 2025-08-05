@@ -192,9 +192,9 @@ pub fn update_counts_and_playable_tiles(
     board.player_to_playable_tiles = player_to_playable_tiles;
 }
 
-pub fn play_move(
+pub fn play_and_resolve_move(
     mut ui_cards: Query<&mut UiCard>,
-    board: Res<BoardResource>,
+    mut board: ResMut<BoardResource>,
     state: Res<State<BoardState>>,
     mut next_state: ResMut<NextState<BoardState>>,
 ) {
@@ -204,7 +204,7 @@ pub fn play_move(
     assert!(!board.card_to_backs.is_empty());
     assert!(board.card_to_backs.len() == board.card_to_neighbors.len());
 
-    if let BoardState::SelectedMove(player, tile) = state.get() {
+    if let BoardState::PlayingMove(player, tile) = state.get() {
         let player_card = match player {
             Player::One => board.player_one_card.unwrap(),
             Player::Two => board.player_two_card.unwrap(),
@@ -244,12 +244,27 @@ pub fn play_move(
             done.insert(current_card);
         }
 
+        next_state.set(BoardState::ResolvingMove(player.clone()));
+    }
+
+    if let BoardState::ResolvingMove(player) = state.get() {
         let next_player = match player {
             Player::One => Player::Two,
             Player::Two => Player::One,
             _ => unreachable!(),
         };
-        next_state.set(BoardState::WaitingForMove(next_player));
+        board.num_resolved_moves += 1;
+        let state =
+            if let Some(next_playable_tiles) = board.player_to_playable_tiles.get(&next_player) {
+                if !next_playable_tiles.is_empty() {
+                    BoardState::WaitingForMove(next_player)
+                } else {
+                    BoardState::Victory(player.clone())
+                }
+            } else {
+                BoardState::Victory(player.clone())
+            };
+        next_state.set(state);
     }
 }
 

@@ -37,7 +37,7 @@ impl Plugin for BoardPlugin {
                 card_and_back::update_counts_and_playable_tiles,
                 select_move::update,
                 select_move::click_move,
-                card_and_back::play_move,
+                card_and_back::play_and_resolve_move,
                 card_and_back::update_backs,
                 select_move::animate,
                 player_block::animate,
@@ -67,6 +67,7 @@ struct BoardResource {
     card_to_backs: HashMap<Entity, Entity>,
     player_to_counts: BTreeMap<Player, usize>,
     player_to_playable_tiles: BTreeMap<Player, BTreeSet<Tile>>,
+    num_resolved_moves: usize,
 }
 
 #[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
@@ -74,5 +75,7 @@ enum BoardState {
     #[default]
     Init,
     WaitingForMove(Player),
-    SelectedMove(Player, Tile),
+    PlayingMove(Player, Tile),
+    ResolvingMove(Player),
+    Victory(Player),
 }

@@ -126,7 +126,7 @@ pub fn click_move(
     if let BoardState::WaitingForMove(player) = state.get() {
         for (ui_select, interaction) in ui_selects {
             if matches!(interaction, Interaction::Pressed) {
-                next_state.set(BoardState::SelectedMove(
+                next_state.set(BoardState::PlayingMove(
                     player.clone(),
                     ui_select.tile.clone(),
                 ));
