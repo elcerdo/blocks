@@ -24,16 +24,16 @@ fn populate_ui(mut commands: Commands, _meshes: ResMut<Assets<Mesh>>) {
         Camera2d,
     ));
 
-    let mut top_left_frame = commands.spawn(Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
-        margin: UiRect::all(Val::Px(5.0)),
-        align_items: AlignItems::Default,
-        justify_content: JustifyContent::Default,
+    let mut ui_frame = commands.spawn(Node {
+        position_type: PositionType::Absolute,
+        right: Val::Px(5.0),
+        top: Val::Px(5.0),
         flex_direction: FlexDirection::Column,
+        align_items: AlignItems::FlexStart,
+        justify_content: JustifyContent::FlexEnd,
         ..default()
     });
 
-    combobox::make_combobox(&mut top_left_frame, vec!["aa", "bb", "cc"]);
-    combobox::make_combobox(&mut top_left_frame, vec!["x", "yy", "zzz", "wwww"]);
+    combobox::make_combobox(&mut ui_frame, vec!["aa", "bb", "cc"]);
+    combobox::make_combobox(&mut ui_frame, vec!["x", "yy", "zzz", "wwww"]);
 }

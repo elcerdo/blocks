@@ -12,12 +12,11 @@ pub struct UiCombobox {
 
 pub fn make_combobox(frame: &mut EntityCommands<'_>, names: Vec<&str>) {
     assert!(!names.is_empty());
-
     let node = Node {
         border: UiRect::all(Val::Px(1.0)),
         padding: UiRect::all(Val::Px(4.0)),
         margin: UiRect::top(Val::Px(5.0)),
-        width: Val::Px(150.0),
+        width: Val::Px(120.0),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::SpaceBetween,
         ..default()
