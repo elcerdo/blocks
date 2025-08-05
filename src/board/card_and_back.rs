@@ -3,19 +3,21 @@ use bevy::prelude::*;
 use super::BoardResource;
 use super::BoardState;
 use super::Player;
-use super::State;
 use super::Tile;
 
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::collections::HashSet;
+use super::player::PLAYER_COLOR_DATA;
+use super::tile::TILE_COLOR_DATA;
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[derive(Component)]
 pub struct UiCard {
-    tile: Tile,
-    row: usize,
+    pub tile: Tile,
+    pub row: usize,
     column: usize,
 }
 
@@ -38,6 +40,119 @@ impl Ord for Priority {
             Ordering::Equal => self.player.cmp(&other.player).reverse(),
         }
     }
+}
+
+pub fn make_pair(
+    texture: &Handle<Image>,
+    atlas_layout: &Handle<TextureAtlasLayout>,
+    slicer: &TextureSlicer,
+    parent: &mut ChildSpawnerCommands,
+    tile: Tile,
+    row: usize,
+    column: usize,
+) -> (Entity, Entity) {
+    let ui_card = UiCard { tile, row, column };
+    let ui_back = UiBack {
+        player: Player::Undef,
+    };
+
+    let tile_index: usize = ui_card.tile.clone().into();
+    let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
+    let bg_color: Color = bg_color.into();
+    let fg_color: Color = fg_color.into();
+
+    let mut card_entity = None;
+    let mut back = parent.spawn((
+        ui_back,
+        Node {
+            width: Val::Px(70.0),
+            height: Val::Px(70.0),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            margin: UiRect::all(Val::Px(0.0)),
+            border: UiRect::all(Val::Px(0.0)),
+            padding: UiRect::all(Val::Px(0.0)),
+            ..default()
+        },
+        BackgroundColor(Srgba::new(0.0, 1.0, 1.0, 0.2).into()),
+    ));
+
+    back.with_children(|parent| {
+        let mut card = parent.spawn((
+            Button,
+            ui_card,
+            Node {
+                width: Val::Px(64.0),
+                height: Val::Px(64.0),
+                align_items: AlignItems::FlexStart,
+                justify_content: JustifyContent::FlexStart,
+                margin: UiRect::all(Val::Px(2.0)),
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(bg_color.clone()),
+            BorderColor(fg_color.clone()),
+            BorderRadius::all(Val::Px(8.0)),
+        ));
+
+        card.with_children(|parent| {
+            let _button = parent.spawn((
+                ImageNode::from_atlas_image(
+                    texture.clone(),
+                    TextureAtlas {
+                        index: atlas_index,
+                        layout: atlas_layout.clone(),
+                    },
+                )
+                .with_color(fg_color.clone())
+                .with_mode(NodeImageMode::Sliced(slicer.clone())),
+                Node {
+                    width: Val::Px(64.0 - 6.0),
+                    height: Val::Px(64.0 - 6.0),
+                    margin: UiRect::all(Val::Px(0.0)),
+                    padding: UiRect::all(Val::Px(16.0)),
+                    border: UiRect::all(Val::Px(0.0)),
+                    ..default()
+                },
+            ));
+        });
+
+        card_entity = Some(card.id());
+    });
+
+    (card_entity.unwrap(), back.id())
+}
+
+pub fn compute_neighborhoods(
+    ui_cards: Query<(&UiCard, Entity)>,
+    mut board: ResMut<BoardResource>,
+    mut next_state: ResMut<NextState<BoardState>>,
+) {
+    let mut coord_to_cards = HashMap::new();
+    for (ui_card, card) in ui_cards.iter() {
+        coord_to_cards.insert((ui_card.row, ui_card.column), card);
+    }
+
+    let mut card_to_neighbors = HashMap::new();
+    for (ui_card, entity) in ui_cards.iter() {
+        let mut neighbors = HashSet::new();
+        if let Some(neighbor) = coord_to_cards.get(&(ui_card.row + 1, ui_card.column)) {
+            neighbors.insert(*neighbor);
+        }
+        if let Some(neighbor) = coord_to_cards.get(&(ui_card.row - 1, ui_card.column)) {
+            neighbors.insert(*neighbor);
+        }
+        if let Some(neighbor) = coord_to_cards.get(&(ui_card.row, ui_card.column + 1)) {
+            neighbors.insert(*neighbor);
+        }
+        if let Some(neighbor) = coord_to_cards.get(&(ui_card.row, ui_card.column - 1)) {
+            neighbors.insert(*neighbor);
+        }
+        card_to_neighbors.insert(entity, neighbors);
+    }
+    board.card_to_neighbors = card_to_neighbors;
+
+    next_state.set(BoardState::WaitingForMove(Player::One));
 }
 
 pub fn update_counts_and_playable_tiles(
@@ -195,5 +310,32 @@ pub fn update_backs(
         ui_back.player = current_priority.player.clone();
 
         done.insert(current_card);
+    }
+}
+
+pub fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>) {
+    for (ui_back, mut back_color) in ui_backs.iter_mut() {
+        let player_index: usize = ui_back.player.clone().into();
+        let (bg_color, _) = PLAYER_COLOR_DATA[player_index].clone();
+        *back_color = bg_color.into();
+    }
+}
+
+pub fn animate_cards(
+    mut ui_cards: Query<(&UiCard, &Children, &mut BorderColor, &mut BackgroundColor), With<Button>>,
+    mut buttons: Query<&mut ImageNode>,
+) {
+    for (ui_card, children, mut border_color, mut back_color) in ui_cards.iter_mut() {
+        let tile_index: usize = ui_card.tile.clone().into();
+        let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
+        let bg_color: Color = bg_color.into();
+        let fg_color: Color = fg_color.into();
+        *border_color = fg_color.into();
+        *back_color = bg_color.into();
+        for child in children {
+            let mut button = buttons.get_mut(*child).unwrap();
+            button.color = fg_color;
+            button.texture_atlas.as_mut().unwrap().index = atlas_index;
+        }
     }
 }

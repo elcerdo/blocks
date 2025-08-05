@@ -1,31 +1,36 @@
+mod player;
+mod tile;
+
 mod card_and_back;
 mod debug_label;
 mod player_block;
 mod select_move;
 
-mod anim;
 mod utils;
-
-mod player;
-mod tile;
 
 use player::Player;
 use tile::Tile;
-
-use bevy::prelude::*;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use bevy::prelude::*;
+
 pub struct BoardPlugin;
 
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, debug_label::populate);
-        app.add_systems(Startup, utils::populate_items);
-        app.add_systems(PostStartup, utils::compute_neighborhoods);
+        app.add_systems(
+            Startup,
+            (
+                debug_label::populate,
+                utils::populate_board,
+                card_and_back::compute_neighborhoods,
+            )
+                .chain(),
+        );
         app.add_systems(
             Update,
             (
@@ -37,8 +42,8 @@ impl Plugin for BoardPlugin {
                 select_move::animate,
                 player_block::animate,
                 debug_label::animate,
-                anim::animate_backs,
-                anim::animate_cards,
+                card_and_back::animate_backs,
+                card_and_back::animate_cards,
             )
                 .chain(),
         );
