@@ -16,6 +16,8 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use log::info;
+
 use bevy::prelude::*;
 
 pub struct BoardPlugin;
@@ -48,6 +50,17 @@ impl Plugin for BoardPlugin {
             )
                 .chain(),
         );
+        app.add_systems(OnEnter(BoardState::Victory(Player::One)), play_yeah_sfx);
+        app.add_systems(OnEnter(BoardState::Victory(Player::Two)), play_yeah_sfx);
+        app.add_systems(
+            OnEnter(BoardState::ResolvingMove(Player::One)),
+            play_collision_sfx,
+        );
+        app.add_systems(
+            OnEnter(BoardState::ResolvingMove(Player::Two)),
+            play_collision_sfx,
+        );
+
         app.init_resource::<BoardResource>();
         app.init_state::<BoardState>();
     }
@@ -79,4 +92,18 @@ enum BoardState {
     PlayingMove(Player, Tile),
     ResolvingMove(Player),
     Victory(Player),
+}
+
+fn play_collision_sfx(mut commands: Commands, asset_server: Res<AssetServer>) {
+    info!("!!! collision !!!!");
+    let audio = asset_server.load("sounds/breakout_collision.ogg");
+    let audio = AudioPlayer::new(audio);
+    commands.spawn((audio, PlaybackSettings::ONCE));
+}
+
+fn play_yeah_sfx(mut commands: Commands, asset_server: Res<AssetServer>) {
+    info!("!!! yeah !!!!");
+    let audio = asset_server.load("sounds/yeah-7106.ogg");
+    let audio = AudioPlayer::new(audio);
+    commands.spawn((audio, PlaybackSettings::ONCE));
 }

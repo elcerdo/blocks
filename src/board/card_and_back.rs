@@ -189,6 +189,10 @@ pub fn update_counts_and_playable_tiles(
             }
         }
     }
+    for (player, playable_tiles) in player_to_playable_tiles.iter() {
+        assert!(*player != Player::Undef);
+        assert!(!playable_tiles.contains(&Tile::Undef));
+    }
     board.player_to_playable_tiles = player_to_playable_tiles;
 }
 

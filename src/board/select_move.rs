@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 #[derive(Component)]
 pub struct UiSelectMove {
     tile: Tile,
-    playable: bool,
+    is_playable: bool,
 }
 
 pub fn make(
@@ -23,7 +23,7 @@ pub fn make(
 ) -> Entity {
     let ui_select = UiSelectMove {
         tile,
-        playable: false,
+        is_playable: false,
     };
 
     let tile_index: usize = ui_select.tile.clone().into();
@@ -114,7 +114,7 @@ pub fn update(
     ];
     for select_card in select_cards {
         let mut select_card = ui_selects.get_mut(select_card).unwrap();
-        select_card.playable = playable_tiles.contains(&select_card.tile);
+        select_card.is_playable = playable_tiles.contains(&select_card.tile);
     }
 }
 
@@ -125,7 +125,7 @@ pub fn click_move(
 ) {
     if let BoardState::WaitingForMove(player) = state.get() {
         for (ui_select, interaction) in ui_selects {
-            if matches!(interaction, Interaction::Pressed) {
+            if ui_select.is_playable && matches!(interaction, Interaction::Pressed) {
                 next_state.set(BoardState::PlayingMove(
                     player.clone(),
                     ui_select.tile.clone(),
@@ -155,15 +155,16 @@ pub fn animate(
         ui_selects.iter_mut()
     {
         let tile_index: usize = ui_select.tile.clone().into();
-        let tile_index_: usize = if ui_select.playable { tile_index } else { 0 };
+        let tile_index_: usize = if ui_select.is_playable { tile_index } else { 0 };
         let (_, _, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
         let (bg_color, fg_color, _) = TILE_COLOR_DATA[tile_index_].clone();
         let bg_color: Color = bg_color.into();
-        let fg_color: Color = if ui_select.playable && matches!(interaction, Interaction::Hovered) {
-            strobe.into()
-        } else {
-            fg_color.into()
-        };
+        let fg_color: Color =
+            if ui_select.is_playable && matches!(interaction, Interaction::Hovered) {
+                strobe.into()
+            } else {
+                fg_color.into()
+            };
         *border_color = fg_color.into();
         *back_color = bg_color.into();
         for child in children {
