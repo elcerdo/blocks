@@ -4,7 +4,7 @@ use super::BoardResource;
 use super::BoardState;
 
 #[derive(Component)]
-pub(crate) struct UiDebugLabel;
+pub struct UiDebugLabel;
 
 pub fn populate(mut commands: Commands) {
     let mut debug_frame = commands.spawn(Node {

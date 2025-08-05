@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
-use super::BOARD_WIDTH;
 use super::BoardState;
-use super::player::{PLAYER_COLOR_DATA, Player};
+use super::Player;
+
+use super::BOARD_WIDTH;
+use super::player::PLAYER_COLOR_DATA;
 
 #[derive(Component)]
-pub(crate) struct UiPlayerBlock {
+pub struct UiPlayerBlock {
     player: Player,
 }
 

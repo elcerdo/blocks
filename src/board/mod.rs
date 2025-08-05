@@ -1,8 +1,9 @@
 mod debug_label;
 mod player_block;
+mod select_move;
 
 mod anim;
-mod make;
+mod utils;
 
 mod player;
 mod tile;
@@ -23,21 +24,21 @@ pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, debug_label::populate);
-        app.add_systems(Startup, make::populate_items);
-        app.add_systems(PostStartup, make::compute_neighborhoods);
+        app.add_systems(Startup, utils::populate_items);
+        app.add_systems(PostStartup, utils::compute_neighborhoods);
         app.add_systems(
             Update,
             (
                 update_counts_and_playable_tiles,
-                update_selects,
-                click_selects,
+                select_move::update,
+                select_move::click,
                 play_selects,
                 update_backs,
+                select_move::animate,
                 player_block::animate,
                 debug_label::animate,
                 anim::animate_backs,
                 anim::animate_cards,
-                anim::animate_selects,
             )
                 .chain(),
         );
@@ -60,12 +61,6 @@ pub struct UiCard {
 #[derive(Component)]
 pub struct UiBack {
     pub player: Player,
-}
-
-#[derive(Component)]
-pub struct UiSelect {
-    pub tile: Tile,
-    pub playable: bool,
 }
 
 #[derive(Resource, Default)]
@@ -140,52 +135,6 @@ fn update_counts_and_playable_tiles(
         }
     }
     board.player_to_playable_tiles = player_to_playable_tiles;
-}
-
-fn update_selects(
-    mut ui_selects: Query<&mut UiSelect>,
-    board: Res<BoardResource>,
-    state: Res<State<BoardState>>,
-) {
-    assert!(board.select_red_card.is_some());
-    assert!(board.select_green_card.is_some());
-    assert!(board.select_blue_card.is_some());
-
-    let playable_tiles = if let BoardState::WaitingForMove(player) = state.get() {
-        match board.player_to_playable_tiles.get(player) {
-            Some(playable_tiles) => playable_tiles.clone(),
-            None => BTreeSet::new(),
-        }
-    } else {
-        BTreeSet::new()
-    };
-
-    let select_cards = [
-        board.select_red_card.unwrap(),
-        board.select_green_card.unwrap(),
-        board.select_blue_card.unwrap(),
-    ];
-    for select_card in select_cards {
-        let mut select_card = ui_selects.get_mut(select_card).unwrap();
-        select_card.playable = playable_tiles.contains(&select_card.tile);
-    }
-}
-
-fn click_selects(
-    ui_selects: Query<(&UiSelect, &Interaction), (Changed<Interaction>, With<Button>)>,
-    state: Res<State<BoardState>>,
-    mut next_state: ResMut<NextState<BoardState>>,
-) {
-    if let BoardState::WaitingForMove(player) = state.get() {
-        for (ui_select, interaction) in ui_selects {
-            if matches!(interaction, Interaction::Pressed) {
-                next_state.set(BoardState::SelectedMove(
-                    player.clone(),
-                    ui_select.tile.clone(),
-                ));
-            }
-        }
-    }
 }
 
 fn play_selects(

@@ -7,89 +7,14 @@ use super::BoardResource;
 use super::BoardState;
 use super::UiBack;
 use super::UiCard;
-use super::UiSelect;
 use super::player::Player;
 use super::tile::{TILE_COLOR_DATA, Tile};
 
 use super::player_block;
+use super::select_move;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-
-fn make_select(
-    texture: &Handle<Image>,
-    atlas_layout: &Handle<TextureAtlasLayout>,
-    slicer: &TextureSlicer,
-    parent: &mut ChildSpawnerCommands,
-    tile: Tile,
-) -> Entity {
-    let ui_select = UiSelect {
-        tile,
-        playable: false,
-    };
-
-    let tile_index: usize = ui_select.tile.clone().into();
-    let (bg_color, fg_color, atlas_index) = TILE_COLOR_DATA[tile_index].clone();
-    let bg_color: Color = bg_color.into();
-    let fg_color: Color = fg_color.into();
-
-    let mut card_entity = None;
-    let mut back = parent.spawn((Node {
-        width: Val::Px(70.0),
-        height: Val::Px(70.0),
-        align_items: AlignItems::Center,
-        justify_content: JustifyContent::Center,
-        margin: UiRect::all(Val::Px(0.0)),
-        border: UiRect::all(Val::Px(0.0)),
-        padding: UiRect::all(Val::Px(0.0)),
-        ..default()
-    },));
-
-    back.with_children(|parent| {
-        let mut card = parent.spawn((
-            ui_select,
-            Button,
-            Node {
-                width: Val::Px(64.0),
-                height: Val::Px(64.0),
-                align_items: AlignItems::FlexStart,
-                justify_content: JustifyContent::FlexStart,
-                margin: UiRect::all(Val::Px(2.0)),
-                border: UiRect::all(Val::Px(2.0)),
-                ..default()
-            },
-            BackgroundColor(bg_color.clone()),
-            BorderColor(fg_color.clone()),
-            BorderRadius::all(Val::Px(8.0)),
-        ));
-
-        card.with_children(|parent| {
-            let _button = parent.spawn((
-                ImageNode::from_atlas_image(
-                    texture.clone(),
-                    TextureAtlas {
-                        index: atlas_index,
-                        layout: atlas_layout.clone(),
-                    },
-                )
-                .with_color(fg_color.clone())
-                .with_mode(NodeImageMode::Sliced(slicer.clone())),
-                Node {
-                    width: Val::Px(64.0 - 6.0),
-                    height: Val::Px(64.0 - 6.0),
-                    margin: UiRect::all(Val::Px(0.0)),
-                    padding: UiRect::all(Val::Px(16.0)),
-                    border: UiRect::all(Val::Px(0.0)),
-                    ..default()
-                },
-            ));
-        });
-
-        card_entity = Some(card.id());
-    });
-
-    card_entity.unwrap()
-}
 
 fn make_card(
     texture: &Handle<Image>,
@@ -239,11 +164,11 @@ pub fn populate_items(
             })
             .with_children(|parent| {
                 let select_red_entity =
-                    make_select(&texture, &atlas_layout, &slicer, parent, Tile::Red);
+                    select_move::make(&texture, &atlas_layout, &slicer, parent, Tile::Red);
                 let select_green_card =
-                    make_select(&texture, &atlas_layout, &slicer, parent, Tile::Green);
+                    select_move::make(&texture, &atlas_layout, &slicer, parent, Tile::Green);
                 let select_blue_entity =
-                    make_select(&texture, &atlas_layout, &slicer, parent, Tile::Blue);
+                    select_move::make(&texture, &atlas_layout, &slicer, parent, Tile::Blue);
                 board.select_red_card = Some(select_red_entity);
                 board.select_green_card = Some(select_green_card);
                 board.select_blue_card = Some(select_blue_entity);
