@@ -13,8 +13,38 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+pub struct BoardPlugin;
+
+impl Plugin for BoardPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, populate_cards_and_labels);
+        app.add_systems(PostStartup, populate_neighbors);
+        app.add_systems(
+            Update,
+            (
+                update_counts_and_playable_tiles,
+                update_selects,
+                click_selects,
+                play_selects,
+                update_backs,
+                animate_status,
+                animate_backs,
+                animate_cards,
+                animate_selects,
+            )
+                .chain(),
+        );
+        app.init_resource::<BoardResource>();
+        app.init_state::<BoardState>();
+    }
+}
+
+const BOARD_WIDTH: usize = 14;
+const BOARD_HEIGHT: usize = 7;
+const BOARD_SEED: usize = 0xabf8f1afb5;
+
 #[derive(Resource, Default)]
-struct Game {
+struct BoardResource {
     player_one_card: Option<Entity>,
     player_two_card: Option<Entity>,
     select_red_card: Option<Entity>,
@@ -27,41 +57,12 @@ struct Game {
 }
 
 #[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
-enum GameState {
+enum BoardState {
     #[default]
     Init,
     WaitingForMove(Player),
     SelectedMove(Player, Tile),
 }
-
-pub struct BoardPlugin;
-
-impl Plugin for BoardPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, populate_cards);
-        app.add_systems(PostStartup, populate_neighbors);
-        app.add_systems(
-            Update,
-            (
-                update_game,
-                update_selects,
-                click_selects,
-                play_selects,
-                update_backs,
-                animate_status,
-                animate_backs,
-                animate_cards,
-                animate_selects,
-            )
-                .chain(),
-        );
-        app.init_resource::<Game>();
-        app.init_state::<GameState>();
-    }
-}
-
-const BOARD_WIDTH: usize = 12;
-const BOARD_HEIGHT: usize = 8;
 
 #[derive(Component, Clone, Debug)]
 pub struct UiCard {
@@ -84,16 +85,10 @@ pub struct UiSelect {
 #[derive(Component)]
 pub struct UiStatus;
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, PartialOrd)]
 struct Priority {
     distance: usize,
     player: Player,
-}
-
-impl PartialOrd for Priority {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(&other))
-    }
 }
 
 impl Ord for Priority {
@@ -106,10 +101,10 @@ impl Ord for Priority {
     }
 }
 
-fn populate_cards(
+fn populate_cards_and_labels(
     mut commands: Commands,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
-    mut game: ResMut<Game>,
+    mut board: ResMut<BoardResource>,
     asset_server: Res<AssetServer>,
 ) {
     let texture = asset_server.load("textures/border_sheet.png");
@@ -124,8 +119,6 @@ fn populate_cards(
         sides_scale_mode: SliceScaleMode::Stretch,
         max_corner_scale: 1.0,
     };
-
-    commands.spawn(Camera2d);
 
     let make_card = |parent: &mut ChildSpawnerCommands,
                      tile: Tile,
@@ -273,6 +266,58 @@ fn populate_cards(
         card_entity.unwrap()
     };
 
+    let make_player_labels =
+        |parent: &mut ChildSpawnerCommands, left_player: Player, right_player: Player| {
+            let make_label = |container: &mut EntityCommands, player: Player| {
+                let index: usize = player.clone().into();
+                let (color_bg, color_fg) = PLAYER_COLOR_DATA[index];
+                let color_bg: Color = color_bg.into();
+                let color_fg: Color = color_fg.into();
+                let label = match player.clone() {
+                    Player::One => "P1",
+                    Player::Two => "P2",
+                    Player::Undef => "??",
+                };
+                container.with_children(|parent| {
+                    let mut div = parent.spawn((
+                        Node {
+                            width: Val::Px(70.0),
+                            height: Val::Px(70.0),
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Center,
+                            ..default()
+                        },
+                        BackgroundColor(color_bg),
+                    ));
+                    div.with_child((TextColor(color_fg.into()), Text::new(label)));
+                });
+            };
+
+            let make_spacer = |container: &mut EntityCommands| {
+                container.with_child((
+                    Node {
+                        width: Val::Px(70.0 * (BOARD_WIDTH - 2) as f32),
+                        height: Val::Px(70.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    // BackgroundColor(PURPLE.into()),
+                ));
+            };
+
+            let mut container = parent.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::FlexStart,
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            });
+
+            make_label(&mut container, left_player);
+            make_spacer(&mut container);
+            make_label(&mut container, right_player);
+        };
+
     let mut body_frame = commands.spawn(Node {
         width: Val::Percent(100.0),
         height: Val::Percent(100.0),
@@ -283,7 +328,8 @@ fn populate_cards(
     });
 
     body_frame.with_children(|parent| {
-        let mut seed: usize = 0xabff1aab45;
+        let mut seed = BOARD_SEED;
+        make_player_labels(parent, Player::One, Player::Undef);
         for row in 0..BOARD_HEIGHT {
             parent
                 .spawn(Node {
@@ -297,50 +343,53 @@ fn populate_cards(
                         let tile = Tile::from(seed);
                         seed ^= 0x9e3779b9 + (seed << 6) + (seed >> 2);
                         let (card_entity, back_entity) = make_card(parent, tile, row, column);
-                        game.card_to_backs.insert(card_entity, back_entity);
+                        board.card_to_backs.insert(card_entity, back_entity);
                         if row == 0 && column == 0 {
-                            game.player_one_card = Some(card_entity);
+                            board.player_one_card = Some(card_entity);
                         }
                         if row + 1 == BOARD_HEIGHT && column + 1 == BOARD_WIDTH {
-                            game.player_two_card = Some(card_entity);
+                            board.player_two_card = Some(card_entity);
                         }
                     }
                 });
         }
+        make_player_labels(parent, Player::Undef, Player::Two);
         parent
             .spawn(Node {
+                position_type: PositionType::Relative,
+                top: Val::Px(-35.0),
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
-                margin: UiRect::top(Val::Px(10.0)),
                 ..default()
             })
             .with_children(|parent| {
                 let select_red_entity = make_select(parent, Tile::Red);
                 let select_green_card = make_select(parent, Tile::Green);
                 let select_blue_entity = make_select(parent, Tile::Blue);
-                game.select_red_card = Some(select_red_entity);
-                game.select_green_card = Some(select_green_card);
-                game.select_blue_card = Some(select_blue_entity);
+                board.select_red_card = Some(select_red_entity);
+                board.select_green_card = Some(select_green_card);
+                board.select_blue_card = Some(select_blue_entity);
             });
-        parent.spawn((
-            UiStatus,
-            Node {
-                margin: UiRect::all(Val::Px(10.0)),
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            Text::new("status"),
-            TextColor(WHITE.into()),
-        ));
     });
+
+    let mut debug_frame = commands.spawn(Node {
+        position_type: PositionType::Absolute,
+        left: Val::Px(5.0),
+        bottom: Val::Px(5.0),
+        flex_direction: FlexDirection::ColumnReverse,
+        align_items: AlignItems::FlexEnd,
+        justify_content: JustifyContent::FlexStart,
+        ..default()
+    });
+
+    debug_frame.with_child((UiStatus, Text::new("status"), TextColor(WHITE.into())));
 }
 
 fn populate_neighbors(
     ui_cards: Query<(&UiCard, Entity)>,
-    mut game: ResMut<Game>,
-    mut next_state: ResMut<NextState<GameState>>,
+    mut board: ResMut<BoardResource>,
+    mut next_state: ResMut<NextState<BoardState>>,
 ) {
     let mut coord_to_cards = HashMap::new();
     for (ui_card, card) in ui_cards.iter() {
@@ -364,15 +413,15 @@ fn populate_neighbors(
         }
         card_to_neighbors.insert(entity, neighbors);
     }
-    game.card_to_neighbors = card_to_neighbors;
+    board.card_to_neighbors = card_to_neighbors;
 
-    next_state.set(GameState::WaitingForMove(Player::One));
+    next_state.set(BoardState::WaitingForMove(Player::One));
 }
 
-fn update_game(
+fn update_counts_and_playable_tiles(
     ui_backs: Query<&UiBack>,
     ui_cards: Query<(&UiCard, Entity)>,
-    mut game: ResMut<Game>,
+    mut board: ResMut<BoardResource>,
 ) {
     let mut player_to_counts = BTreeMap::new();
     for ui_back in ui_backs.iter() {
@@ -381,19 +430,19 @@ fn update_game(
         }
         *player_to_counts.get_mut(&ui_back.player).unwrap() += 1;
     }
-    game.player_to_counts = player_to_counts;
+    board.player_to_counts = player_to_counts;
 
     let mut player_to_playable_tiles = BTreeMap::new();
     player_to_playable_tiles.insert(Player::One, BTreeSet::new());
     player_to_playable_tiles.insert(Player::Two, BTreeSet::new());
     for (ui_card, card_entity) in ui_cards.iter() {
-        let back_entity = *game.card_to_backs.get(&card_entity).unwrap();
+        let back_entity = *board.card_to_backs.get(&card_entity).unwrap();
         let ui_back = ui_backs.get(back_entity).unwrap();
         if let Some(playable_tiles) = player_to_playable_tiles.get_mut(&ui_back.player) {
             assert!(ui_card.tile != Tile::Undef);
-            for card_entity_ in game.card_to_neighbors.get(&card_entity).unwrap() {
+            for card_entity_ in board.card_to_neighbors.get(&card_entity).unwrap() {
                 let card_entity_ = *card_entity_;
-                let back_entity_ = *game.card_to_backs.get(&card_entity_).unwrap();
+                let back_entity_ = *board.card_to_backs.get(&card_entity_).unwrap();
                 let ui_card_ = ui_cards.get(card_entity_).unwrap().0;
                 let ui_back_ = ui_backs.get(back_entity_).unwrap();
                 if ui_back_.player != ui_back.player && ui_card_.tile != Tile::Undef {
@@ -403,20 +452,20 @@ fn update_game(
             }
         }
     }
-    game.player_to_playable_tiles = player_to_playable_tiles;
+    board.player_to_playable_tiles = player_to_playable_tiles;
 }
 
 fn update_selects(
     mut ui_selects: Query<&mut UiSelect>,
-    game: Res<Game>,
-    state: Res<State<GameState>>,
+    board: Res<BoardResource>,
+    state: Res<State<BoardState>>,
 ) {
-    assert!(game.select_red_card.is_some());
-    assert!(game.select_green_card.is_some());
-    assert!(game.select_blue_card.is_some());
+    assert!(board.select_red_card.is_some());
+    assert!(board.select_green_card.is_some());
+    assert!(board.select_blue_card.is_some());
 
-    let playable_tiles = if let GameState::WaitingForMove(player) = state.get() {
-        match game.player_to_playable_tiles.get(player) {
+    let playable_tiles = if let BoardState::WaitingForMove(player) = state.get() {
+        match board.player_to_playable_tiles.get(player) {
             Some(playable_tiles) => playable_tiles.clone(),
             None => BTreeSet::new(),
         }
@@ -425,9 +474,9 @@ fn update_selects(
     };
 
     let select_cards = [
-        game.select_red_card.unwrap(),
-        game.select_green_card.unwrap(),
-        game.select_blue_card.unwrap(),
+        board.select_red_card.unwrap(),
+        board.select_green_card.unwrap(),
+        board.select_blue_card.unwrap(),
     ];
     for select_card in select_cards {
         let mut select_card = ui_selects.get_mut(select_card).unwrap();
@@ -437,13 +486,13 @@ fn update_selects(
 
 fn click_selects(
     ui_selects: Query<(&UiSelect, &Interaction), (Changed<Interaction>, With<Button>)>,
-    state: Res<State<GameState>>,
-    mut next_state: ResMut<NextState<GameState>>,
+    state: Res<State<BoardState>>,
+    mut next_state: ResMut<NextState<BoardState>>,
 ) {
-    if let GameState::WaitingForMove(player) = state.get() {
+    if let BoardState::WaitingForMove(player) = state.get() {
         for (ui_select, interaction) in ui_selects {
             if matches!(interaction, Interaction::Pressed) {
-                next_state.set(GameState::SelectedMove(
+                next_state.set(BoardState::SelectedMove(
                     player.clone(),
                     ui_select.tile.clone(),
                 ));
@@ -454,20 +503,20 @@ fn click_selects(
 
 fn play_selects(
     mut ui_cards: Query<&mut UiCard>,
-    game: Res<Game>,
-    state: Res<State<GameState>>,
-    mut next_state: ResMut<NextState<GameState>>,
+    board: Res<BoardResource>,
+    state: Res<State<BoardState>>,
+    mut next_state: ResMut<NextState<BoardState>>,
 ) {
-    assert!(game.player_one_card.is_some());
-    assert!(game.player_two_card.is_some());
-    assert!(!game.card_to_neighbors.is_empty());
-    assert!(!game.card_to_backs.is_empty());
-    assert!(game.card_to_backs.len() == game.card_to_neighbors.len());
+    assert!(board.player_one_card.is_some());
+    assert!(board.player_two_card.is_some());
+    assert!(!board.card_to_neighbors.is_empty());
+    assert!(!board.card_to_backs.is_empty());
+    assert!(board.card_to_backs.len() == board.card_to_neighbors.len());
 
-    if let GameState::SelectedMove(player, tile) = state.get() {
+    if let BoardState::SelectedMove(player, tile) = state.get() {
         let player_card = match player {
-            Player::One => game.player_one_card.unwrap(),
-            Player::Two => game.player_two_card.unwrap(),
+            Player::One => board.player_one_card.unwrap(),
+            Player::Two => board.player_two_card.unwrap(),
             _ => unreachable!(),
         };
 
@@ -484,7 +533,7 @@ fn play_selects(
         while let Some((current_card, current_priority)) = queue.pop() {
             assert!(!done.contains(&current_card));
 
-            let next_cards = game.card_to_neighbors.get(&current_card).unwrap();
+            let next_cards = board.card_to_neighbors.get(&current_card).unwrap();
             for next_card in next_cards {
                 if done.contains(next_card) {
                     continue;
@@ -509,23 +558,27 @@ fn play_selects(
             Player::Two => Player::One,
             _ => unreachable!(),
         };
-        next_state.set(GameState::WaitingForMove(next_player));
+        next_state.set(BoardState::WaitingForMove(next_player));
     }
 }
 
-fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game: Res<Game>) {
-    assert!(game.player_one_card.is_some());
-    assert!(game.player_two_card.is_some());
-    assert!(!game.card_to_neighbors.is_empty());
-    assert!(!game.card_to_backs.is_empty());
-    assert!(game.card_to_backs.len() == game.card_to_neighbors.len());
+fn update_backs(
+    mut ui_backs: Query<&mut UiBack>,
+    ui_cards: Query<&UiCard>,
+    board: Res<BoardResource>,
+) {
+    assert!(board.player_one_card.is_some());
+    assert!(board.player_two_card.is_some());
+    assert!(!board.card_to_neighbors.is_empty());
+    assert!(!board.card_to_backs.is_empty());
+    assert!(board.card_to_backs.len() == board.card_to_neighbors.len());
 
     for mut ui_back in ui_backs.iter_mut() {
         ui_back.player = Player::Undef;
     }
 
-    let player_one_card = game.player_one_card.unwrap();
-    let player_two_card = game.player_two_card.unwrap();
+    let player_one_card = board.player_one_card.unwrap();
+    let player_two_card = board.player_two_card.unwrap();
 
     let mut done = HashSet::new();
     let mut queue = priority_queue::PriorityQueue::new();
@@ -547,7 +600,7 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
         assert!(!done.contains(&current_card));
 
         let current_tile = ui_cards.get(current_card).unwrap().tile.clone();
-        let next_cards = game.card_to_neighbors.get(&current_card).unwrap();
+        let next_cards = board.card_to_neighbors.get(&current_card).unwrap();
         for next_card in next_cards {
             if done.contains(next_card) {
                 continue;
@@ -561,7 +614,7 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
             queue.push(*next_card, next_priority);
         }
 
-        let ui_back = game.card_to_backs.get(&current_card).unwrap();
+        let ui_back = board.card_to_backs.get(&current_card).unwrap();
         let mut ui_back = ui_backs.get_mut(*ui_back).unwrap();
         ui_back.player = current_priority.player.clone();
 
@@ -571,13 +624,13 @@ fn update_backs(mut ui_backs: Query<&mut UiBack>, ui_cards: Query<&UiCard>, game
 
 fn animate_status(
     mut status: Single<&mut Text, With<UiStatus>>,
-    game: Res<Game>,
-    state: Res<State<GameState>>,
+    board: Res<BoardResource>,
+    state: Res<State<BoardState>>,
 ) {
     let state = state.get();
     let label = format!(
-        "{:?} // {:?} // {:?}",
-        game.player_to_counts, game.player_to_playable_tiles, state,
+        "{:?}\n{:?}\n{:?}",
+        board.player_to_counts, board.player_to_playable_tiles, state,
     );
     **status = label.into();
 }
@@ -585,7 +638,7 @@ fn animate_status(
 fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>) {
     for (ui_back, mut back_color) in ui_backs.iter_mut() {
         let player_index: usize = ui_back.player.clone().into();
-        let bg_color = PLAYER_COLOR_DATA[player_index].clone();
+        let (bg_color, _) = PLAYER_COLOR_DATA[player_index].clone();
         *back_color = bg_color.into();
     }
 }

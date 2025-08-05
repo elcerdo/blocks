@@ -1,7 +1,11 @@
 use bevy::color::Srgba;
-use bevy::color::palettes::css::*;
+use bevy::color::palettes::tailwind::*;
 
-pub const PLAYER_COLOR_DATA: &[Srgba] = &[WHITE, ORANGE, YELLOW];
+pub const PLAYER_COLOR_DATA: &[(Srgba, Srgba)] = &[
+    (GRAY_800, GRAY_200),
+    (ORANGE_200, ORANGE_600),
+    (CYAN_200, CYAN_600),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Player {

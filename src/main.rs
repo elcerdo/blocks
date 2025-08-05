@@ -9,8 +9,8 @@ fn main() {
     let mut app = App::new();
 
     app.add_plugins(DefaultPlugins);
-    app.add_plugins(ui::UiPlugin);
     app.add_plugins(board::BoardPlugin);
+    app.add_plugins(ui::UiPlugin);
 
     #[cfg(not(target_family = "wasm"))]
     {
