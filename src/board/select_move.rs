@@ -118,7 +118,7 @@ pub fn update(
     }
 }
 
-pub fn click(
+pub fn click_move(
     ui_selects: Query<(&UiSelectMove, &Interaction), (Changed<Interaction>, With<Button>)>,
     state: Res<State<BoardState>>,
     mut next_state: ResMut<NextState<BoardState>>,
