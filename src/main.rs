@@ -17,6 +17,8 @@ fn main() {
         app.add_systems(Update, keyboard_shortcuts);
     }
 
+    app.add_systems(Update, play_sfx);
+
     app.run();
 }
 
@@ -27,5 +29,16 @@ fn keyboard_shortcuts(mut writer: EventWriter<AppExit>, keyboard: Res<ButtonInpu
     }
     if keyboard.just_pressed(KeyCode::Space) {
         warn!("reseed");
+    }
+}
+
+fn play_sfx(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    asset_server: Res<AssetServer>,
+) {
+    let audio = asset_server.load("sounds/yeah-7106.ogg");
+    if keyboard.just_pressed(KeyCode::KeyC) {
+        commands.spawn((AudioPlayer::new(audio), PlaybackSettings::ONCE));
     }
 }
