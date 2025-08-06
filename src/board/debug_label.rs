@@ -3,10 +3,19 @@ use bevy::prelude::*;
 use super::BoardResource;
 use super::BoardState;
 
-#[derive(Component)]
-pub struct UiDebugLabel;
+pub struct DebugLabelPlugin;
 
-pub fn populate(mut commands: Commands) {
+impl Plugin for DebugLabelPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, populate);
+        app.add_systems(Update, animate);
+    }
+}
+
+#[derive(Component)]
+struct DebugLabel;
+
+fn populate(mut commands: Commands) {
     let mut debug_frame = commands.spawn(Node {
         position_type: PositionType::Absolute,
         left: Val::Px(5.0),
@@ -16,11 +25,11 @@ pub fn populate(mut commands: Commands) {
         justify_content: JustifyContent::FlexStart,
         ..default()
     });
-    debug_frame.with_child((UiDebugLabel, Text::new("status")));
+    debug_frame.with_child((DebugLabel, Text::new("debug_label")));
 }
 
-pub fn animate(
-    mut status: Single<&mut Text, With<UiDebugLabel>>,
+fn animate(
+    mut debug_label: Single<&mut Text, With<DebugLabel>>,
     board: Res<BoardResource>,
     state: Res<State<BoardState>>,
 ) {
@@ -29,5 +38,5 @@ pub fn animate(
         "{} moves\n{:?}\n{:?}\n{:?}",
         board.num_resolved_moves, board.player_to_counts, board.player_to_playable_tiles, state,
     );
-    **status = label.into();
+    **debug_label = label.into();
 }

@@ -16,14 +16,6 @@ impl Plugin for UiPlugin {
 }
 
 fn populate_ui(mut commands: Commands, _meshes: ResMut<Assets<Mesh>>) {
-    commands.spawn((
-        Camera {
-            order: 2,
-            ..default()
-        },
-        Camera2d,
-    ));
-
     let mut ui_frame = commands.spawn(Node {
         position_type: PositionType::Absolute,
         right: Val::Px(5.0),

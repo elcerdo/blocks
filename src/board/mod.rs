@@ -2,11 +2,13 @@ mod player;
 mod tile;
 
 mod card_and_back;
-mod debug_label;
 mod player_block;
 mod select_move;
 mod sound_effect;
 mod utils;
+
+mod debug_label;
+mod main_banner;
 
 use player::Player;
 use tile::Tile;
@@ -24,25 +26,25 @@ impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Startup,
-            (
-                debug_label::populate,
-                utils::populate_board,
-                card_and_back::compute_neighborhoods,
-            )
-                .chain(),
+            (utils::populate_board, card_and_back::compute_neighborhoods).chain(),
         );
         app.add_systems(
-            Update,
+            PreUpdate,
             (
                 card_and_back::update_counts_and_playable_tiles,
                 select_move::update,
                 select_move::click_move,
                 card_and_back::play_and_resolve_move,
                 card_and_back::update_backs,
+            )
+                .chain(),
+        );
+        app.add_systems(
+            Update,
+            (
                 select_move::animate,
                 player_block::animate_labels,
                 player_block::animate_crowns,
-                debug_label::animate,
                 card_and_back::animate_backs,
                 card_and_back::animate_cards,
             )
@@ -53,6 +55,8 @@ impl Plugin for BoardPlugin {
         app.init_state::<BoardState>();
 
         app.add_plugins(sound_effect::SoundEffectPlugin);
+        app.add_plugins(debug_label::DebugLabelPlugin);
+        app.add_plugins(main_banner::MainBannerPlugin);
     }
 }
 
