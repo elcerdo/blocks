@@ -2,29 +2,34 @@ use bevy::prelude::*;
 
 use log::info;
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct SoundEffectResource {
-    collision: Option<AudioPlayer>,
-    yeah: Option<AudioPlayer>,
+    ding: AudioPlayer,
+    yeah: AudioPlayer,
+    ambiance_aa: AudioPlayer,
+    ambiance_bb: AudioPlayer,
 }
 
-pub fn populate(asset_server: Res<AssetServer>, mut sfx: ResMut<SoundEffectResource>) {
-    let collision = asset_server.load("sounds/breakout_collision.ogg");
+pub fn populate(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let ding = asset_server.load("sounds/ding-notification-sound-383728.ogg");
     let yeah = asset_server.load("sounds/yeah-7106.ogg");
-    sfx.collision = Some(AudioPlayer::new(collision));
-    sfx.yeah = Some(AudioPlayer::new(yeah));
+    let ambiance_aa = asset_server.load("sounds/forest-ambiance-30746.ogg");
+    let ambiance_bb = asset_server.load("sounds/morning-forest-ambiance-17045.ogg");
+    let sfx = SoundEffectResource {
+        ding: AudioPlayer::new(ding),
+        yeah: AudioPlayer::new(yeah),
+        ambiance_aa: AudioPlayer::new(ambiance_aa),
+        ambiance_bb: AudioPlayer::new(ambiance_bb),
+    };
+    commands.insert_resource(sfx);
 }
 
-pub fn play_collision(mut commands: Commands, sfx: Res<SoundEffectResource>) {
+pub fn play_ding(mut commands: Commands, sfx: Res<SoundEffectResource>) {
     info!("!!! collision !!!!");
-    let player = sfx.collision.clone();
-    assert!(player.is_some());
-    commands.spawn((player.unwrap(), PlaybackSettings::ONCE));
+    commands.spawn((sfx.ding.clone(), PlaybackSettings::ONCE));
 }
 
 pub fn play_yeah(mut commands: Commands, sfx: Res<SoundEffectResource>) {
     info!("!!! yeah !!!!");
-    let player = sfx.yeah.clone();
-    assert!(player.is_some());
-    commands.spawn((player.unwrap(), PlaybackSettings::ONCE));
+    commands.spawn((sfx.yeah.clone(), PlaybackSettings::ONCE));
 }

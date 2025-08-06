@@ -60,15 +60,14 @@ impl Plugin for BoardPlugin {
         );
         app.add_systems(
             OnEnter(BoardState::ResolvingMove(Player::One)),
-            sound_effect::play_collision,
+            sound_effect::play_ding,
         );
         app.add_systems(
             OnEnter(BoardState::ResolvingMove(Player::Two)),
-            sound_effect::play_collision,
+            sound_effect::play_ding,
         );
 
         app.init_resource::<BoardResource>();
-        app.init_resource::<sound_effect::SoundEffectResource>();
         app.init_state::<BoardState>();
     }
 }
