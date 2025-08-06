@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 #[derive(Component)]
 pub struct UiSelectMove {
     tile: Tile,
-    is_playable: bool,
+    pub is_playable: bool,
 }
 
 pub fn make(

@@ -28,7 +28,6 @@ impl Plugin for BoardPlugin {
                 debug_label::populate,
                 utils::populate_board,
                 card_and_back::compute_neighborhoods,
-                sound_effect::populate,
             )
                 .chain(),
         );
@@ -50,25 +49,10 @@ impl Plugin for BoardPlugin {
                 .chain(),
         );
 
-        app.add_systems(
-            OnEnter(BoardState::Victory(Player::One)),
-            sound_effect::play_yeah,
-        );
-        app.add_systems(
-            OnEnter(BoardState::Victory(Player::Two)),
-            sound_effect::play_yeah,
-        );
-        app.add_systems(
-            OnEnter(BoardState::ResolvingMove(Player::One)),
-            sound_effect::play_ding,
-        );
-        app.add_systems(
-            OnEnter(BoardState::ResolvingMove(Player::Two)),
-            sound_effect::play_ding,
-        );
-
         app.init_resource::<BoardResource>();
         app.init_state::<BoardState>();
+
+        app.add_plugins(sound_effect::SoundEffectPlugin);
     }
 }
 
