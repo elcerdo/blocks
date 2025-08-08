@@ -100,30 +100,16 @@ pub fn populate_board(
                 ..default()
             })
             .with_children(|parent| {
-                let select_red_entity = select_move::make(
-                    &texture_border,
-                    &atlas_layout_border,
-                    &slicer,
-                    parent,
-                    Tile::Red,
-                );
-                let select_green_card = select_move::make(
-                    &texture_border,
-                    &atlas_layout_border,
-                    &slicer,
-                    parent,
-                    Tile::Green,
-                );
-                let select_blue_entity = select_move::make(
-                    &texture_border,
-                    &atlas_layout_border,
-                    &slicer,
-                    parent,
-                    Tile::Blue,
-                );
-                board.select_red_card = Some(select_red_entity);
-                board.select_green_card = Some(select_green_card);
-                board.select_blue_card = Some(select_blue_entity);
+                board.select_cards.clear();
+                for tile in [Tile::Red, Tile::Green, Tile::Blue, Tile::Yellow] {
+                    board.select_cards.push(select_move::make(
+                        &texture_border,
+                        &atlas_layout_border,
+                        &slicer,
+                        parent,
+                        tile,
+                    ));
+                }
             });
     });
 }

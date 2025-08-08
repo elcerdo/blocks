@@ -94,9 +94,7 @@ pub fn update(
     board: Res<BoardResource>,
     state: Res<State<BoardState>>,
 ) {
-    assert!(board.select_red_card.is_some());
-    assert!(board.select_green_card.is_some());
-    assert!(board.select_blue_card.is_some());
+    assert!(board.select_cards.len() == 4);
 
     let playable_tiles = if let BoardState::WaitingForMove(player) = state.get() {
         match board.player_to_playable_tiles.get(player) {
@@ -107,13 +105,8 @@ pub fn update(
         BTreeSet::new()
     };
 
-    let select_cards = [
-        board.select_red_card.unwrap(),
-        board.select_green_card.unwrap(),
-        board.select_blue_card.unwrap(),
-    ];
-    for select_card in select_cards {
-        let mut select_card = ui_selects.get_mut(select_card).unwrap();
+    for select_card in board.select_cards.iter() {
+        let mut select_card = ui_selects.get_mut(*select_card).unwrap();
         select_card.is_playable = playable_tiles.contains(&select_card.tile);
     }
 }

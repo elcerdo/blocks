@@ -62,15 +62,13 @@ impl Plugin for BoardPlugin {
 
 const BOARD_WIDTH: usize = 14;
 const BOARD_HEIGHT: usize = 7;
-const BOARD_SEED: usize = 0xabf8f1af;
+const BOARD_SEED: usize = 0xab28f3af;
 
 #[derive(Resource, Default)]
 struct BoardResource {
     player_one_card: Option<Entity>,
     player_two_card: Option<Entity>,
-    select_red_card: Option<Entity>,
-    select_green_card: Option<Entity>,
-    select_blue_card: Option<Entity>,
+    select_cards: Vec<Entity>,
     card_to_neighbors: HashMap<Entity, HashSet<Entity>>,
     card_to_backs: HashMap<Entity, Entity>,
     player_to_counts: BTreeMap<Player, usize>,
