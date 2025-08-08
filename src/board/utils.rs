@@ -51,6 +51,7 @@ pub fn populate_board(
             parent,
             Player::One,
             Player::Undef,
+            true,
         );
         for row in 0..BOARD_HEIGHT {
             parent
@@ -89,6 +90,7 @@ pub fn populate_board(
             parent,
             Player::Undef,
             Player::Two,
+            false,
         );
         parent
             .spawn(Node {

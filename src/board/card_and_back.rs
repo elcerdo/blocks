@@ -189,6 +189,25 @@ pub fn update_counts_and_playable_tiles(
             }
         }
     }
+
+    {
+        let mut remove_other_player_tile = |player: Player, player_: Player| {
+            let card_entity = match player {
+                Player::One => board.player_one_card.unwrap(),
+                Player::Two => board.player_two_card.unwrap(),
+                Player::Undef => unreachable!(),
+            };
+            let back_entity = *board.card_to_backs.get(&card_entity).unwrap();
+            let ui_card = ui_cards.get(card_entity).unwrap().0;
+            let ui_back = ui_backs.get(back_entity).unwrap();
+            assert!(ui_back.player == player || ui_back.player == Player::Undef);
+            let playable_tiles = player_to_playable_tiles.get_mut(&player_).unwrap();
+            playable_tiles.remove(&ui_card.tile);
+        };
+        remove_other_player_tile(Player::One, Player::Two);
+        remove_other_player_tile(Player::Two, Player::One);
+    }
+
     for (player, playable_tiles) in player_to_playable_tiles.iter() {
         assert!(*player != Player::Undef);
         assert!(!playable_tiles.contains(&Tile::Undef));

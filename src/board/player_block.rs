@@ -22,17 +22,50 @@ pub fn make_pair(
     parent: &mut ChildSpawnerCommands,
     left_player: Player,
     right_player: Player,
+    round_top: bool,
 ) {
-    let block_node = Node {
-        width: Val::Px(70.0),
-        height: Val::Px(70.0),
-        align_items: AlignItems::Center,
-        justify_content: JustifyContent::Center,
-        ..default()
+    let border_radius = 8.0;
+    let (border_radius, border_rect) = if round_top {
+        (
+            BorderRadius {
+                top_left: Val::Px(border_radius),
+                top_right: Val::Px(border_radius),
+                bottom_left: Val::Px(0.0),
+                bottom_right: Val::Px(0.0),
+            },
+            UiRect {
+                top: Val::Px(2.0),
+                bottom: Val::Px(0.0),
+                left: Val::Px(2.0),
+                right: Val::Px(2.0),
+            },
+        )
+    } else {
+        (
+            BorderRadius {
+                top_left: Val::Px(0.0),
+                top_right: Val::Px(0.0),
+                bottom_left: Val::Px(border_radius),
+                bottom_right: Val::Px(border_radius),
+            },
+            UiRect {
+                top: Val::Px(0.0),
+                bottom: Val::Px(2.0),
+                left: Val::Px(2.0),
+                right: Val::Px(2.0),
+            },
+        )
     };
 
     let make_crown = |container: &mut EntityCommands, player: Player| {
         let ui_crown_block = UiCrownBlock { player };
+        let block_node = Node {
+            width: Val::Px(70.0),
+            height: Val::Px(70.0),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        };
         container.with_children(|parent| {
             parent.spawn((
                 block_node.clone(),
@@ -51,6 +84,14 @@ pub fn make_pair(
 
     let make_label = |container: &mut EntityCommands, player: Player| {
         let ui_player_label = UiPlayerBlock { player };
+        let block_node = Node {
+            width: Val::Px(70.0),
+            height: Val::Px(70.0),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            border: border_rect.clone(),
+            ..default()
+        };
         let index: usize = ui_player_label.player.clone().into();
         let (color_bg, color_fg) = PLAYER_COLOR_DATA[index];
         let color_bg: Color = color_bg.into();
@@ -62,12 +103,13 @@ pub fn make_pair(
         };
         container.with_children(|parent| {
             parent
-                .spawn((block_node.clone(), BackgroundColor(color_bg)))
-                .with_child((
-                    ui_player_label,
-                    TextColor(color_fg.into()),
-                    Text::new(label),
-                ));
+                .spawn((
+                    block_node.clone(),
+                    border_radius.clone(),
+                    BackgroundColor(color_bg),
+                    BorderColor(color_fg),
+                ))
+                .with_child((ui_player_label, TextColor(color_fg), Text::new(label)));
         });
     };
 
