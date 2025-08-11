@@ -278,16 +278,20 @@ pub fn play_and_resolve_move(
             Player::Two => Player::One,
             _ => unreachable!(),
         };
+
+        let mut scores: Vec<(Player, usize)> = board.player_to_counts.clone().into_iter().collect();
+        scores.sort_by(|aa, bb| aa.1.cmp(&bb.1).reverse());
+        let winning_player = if scores.is_empty() { Player::Undef } else { scores[0].0.clone() };
         board.num_resolved_moves += 1;
         let state =
             if let Some(next_playable_tiles) = board.player_to_playable_tiles.get(&next_player) {
                 if !next_playable_tiles.is_empty() {
                     BoardState::WaitingForMove(next_player)
                 } else {
-                    BoardState::Victory(player.clone())
+                    BoardState::Victory(winning_player.clone())
                 }
             } else {
-                BoardState::Victory(player.clone())
+                BoardState::Victory(winning_player.clone())
             };
         next_state.set(state);
     }
