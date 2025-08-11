@@ -6,6 +6,7 @@ use super::Player;
 use super::Tile;
 use super::Direction;
 
+use super::BOARD_BLOCK;
 use super::player::PLAYER_COLOR_DATA;
 use super::tile::TILE_COLOR_DATA;
 
@@ -66,8 +67,8 @@ pub fn make_pair(
     let mut back = parent.spawn((
         ui_back,
         Node {
-            width: Val::Px(70.0),
-            height: Val::Px(70.0),
+            width: Val::Px(BOARD_BLOCK),
+            height: Val::Px(BOARD_BLOCK),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             margin: UiRect::all(Val::Px(0.0)),
@@ -383,7 +384,7 @@ pub fn animate_backs(
                 Val::Px(2.0)
             }
         };
-        
+
         let top = if ui_card == board.player_one_card.unwrap() {
             Val::Px(0.0)
         } else {

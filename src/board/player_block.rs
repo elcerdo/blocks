@@ -4,6 +4,7 @@ use super::BoardState;
 use super::Player;
 
 use super::BOARD_WIDTH;
+use super::BOARD_BLOCK;
 use super::player::PLAYER_COLOR_DATA;
 
 #[derive(Component)]
@@ -60,8 +61,8 @@ pub fn make_pair(
     let make_crown = |container: &mut EntityCommands, player: Player| {
         let ui_crown_block = UiCrownBlock { player };
         let block_node = Node {
-            width: Val::Px(70.0),
-            height: Val::Px(70.0),
+            width: Val::Px(BOARD_BLOCK),
+            height: Val::Px(BOARD_BLOCK),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             ..default()
@@ -85,8 +86,8 @@ pub fn make_pair(
     let make_label = |container: &mut EntityCommands, player: Player| {
         let ui_player_label = UiPlayerBlock { player };
         let block_node = Node {
-            width: Val::Px(70.0),
-            height: Val::Px(70.0),
+            width: Val::Px(BOARD_BLOCK),
+            height: Val::Px(3.0 * BOARD_BLOCK / 4.0),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             border: border_rect.clone(),
@@ -102,21 +103,39 @@ pub fn make_pair(
             Player::Undef => "??",
         };
         container.with_children(|parent| {
-            parent
-                .spawn((
+            let flex_direction = if round_top {
+                FlexDirection::Column
+            } else {
+                FlexDirection::ColumnReverse
+            };
+            parent.spawn((
+                Node {
+                    width: Val::Px(BOARD_BLOCK),
+                    height: Val::Px(BOARD_BLOCK),
+                    flex_direction,
+                    align_items: AlignItems::FlexEnd,
+                    justify_content: JustifyContent::FlexEnd,
+                    ..default()
+                },
+            )).with_children(|parent| {
+                parent.spawn((
                     block_node.clone(),
                     border_radius.clone(),
                     BackgroundColor(color_bg),
                     BorderColor(color_fg),
-                ))
-                .with_child((ui_player_label, TextColor(color_fg), Text::new(label)));
+                )).with_child((
+                    ui_player_label,
+                    TextColor(color_fg),
+                    Text::new(label),
+                ));
+            });
         });
     };
 
     let make_spacer = |container: &mut EntityCommands| {
         container.with_child(Node {
-            width: Val::Px(70.0 * (BOARD_WIDTH - 4) as f32),
-            height: Val::Px(70.0),
+            width: Val::Px(BOARD_BLOCK * (BOARD_WIDTH - 4) as f32),
+            height: Val::Px(BOARD_BLOCK),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             ..default()
@@ -126,7 +145,7 @@ pub fn make_pair(
     let mut container = parent.spawn(Node {
         flex_direction: FlexDirection::Row,
         align_items: AlignItems::FlexStart,
-        justify_content: JustifyContent::SpaceBetween,
+        justify_content: JustifyContent::FlexStart,
         ..default()
     });
 

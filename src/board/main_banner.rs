@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use super::BoardResource;
 use super::BoardState;
 use super::Player;
+use super::BOARD_BLOCK;
 use super::player::PLAYER_COLOR_DATA;
 
 pub struct MainBannerPlugin;
@@ -32,11 +33,10 @@ fn populate(mut commands: Commands) {
         MainBannerDiv,
         Node {
             position_type: PositionType::Absolute,
-            top: Val::Px(10.0),
-            right: Val::Px(10.0),
-            width: Val::Px(3.0 * 70.0 - 24.0),
-            height: Val::Px(1.0 * 70.0 - 24.0),
-            padding: UiRect::all(Val::Px(10.0)),
+            top: Val::Px(5.0),
+            right: Val::Px(5.0),
+            width: Val::Px(2.0 * BOARD_BLOCK),
+            height: Val::Px(3.0 * BOARD_BLOCK / 4.0),
             border: UiRect::all(Val::Px(2.0)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -56,7 +56,7 @@ fn populate(mut commands: Commands) {
     let mut frame = commands.spawn((
         Node {
             position_type: PositionType::Absolute,
-            top: Val::Px(2.0 * 10.0 + 1.0 * 70.0 - 24.0),
+            top: Val::Px(2.0 * 5.0 + 3.0 * BOARD_BLOCK / 4.0),
             right: Val::Px(10.0),
             align_items: AlignItems::FlexEnd,
             justify_content: JustifyContent::FlexStart,

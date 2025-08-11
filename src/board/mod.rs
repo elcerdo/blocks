@@ -54,13 +54,14 @@ impl Plugin for BoardPlugin {
         app.init_state::<BoardState>();
 
         app.add_plugins(sound_effect::SoundEffectPlugin);
-        app.add_plugins(debug_label::DebugLabelPlugin);     
         app.add_plugins(main_banner::MainBannerPlugin);        
+        // app.add_plugins(debug_label::DebugLabelPlugin);     
     }
 }
 
 const BOARD_WIDTH: usize = 14;
 const BOARD_HEIGHT: usize = 7;
+const BOARD_BLOCK: f32 = 74.0;
 const BOARD_SEED: usize = 0xab28f3af;
 
 #[derive(PartialEq, Eq, Hash)]
