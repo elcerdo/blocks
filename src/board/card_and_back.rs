@@ -71,10 +71,11 @@ pub fn make_pair(
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             margin: UiRect::all(Val::Px(0.0)),
-            border: UiRect::all(Val::Px(0.0)),
+            border: UiRect::all(Val::Px(2.0)),
             padding: UiRect::all(Val::Px(0.0)),
             ..default()
         },
+        BorderColor::default(),
         BackgroundColor::default(),
     ));
 
@@ -302,24 +303,23 @@ pub fn update_backs(
     assert!(!board.card_to_backs.is_empty());
     assert!(board.card_to_backs.len() == board.card_to_neighbors.len());
 
+    // reset player
     for mut ui_back in ui_backs.iter_mut() {
         ui_back.player = Player::Undef;
     }
 
-    let player_one_card = board.player_one_card.unwrap();
-    let player_two_card = board.player_two_card.unwrap();
-
+    // set player background
     let mut done = HashSet::new();
     let mut queue = priority_queue::PriorityQueue::new();
     queue.push(
-        player_one_card,
+        board.player_one_card.unwrap(),
         Priority {
             distance: 0,
             player: Player::One,
         },
     );
     queue.push(
-        player_two_card,
+        board.player_two_card.unwrap(),
         Priority {
             distance: 0,
             player: Player::Two,
@@ -350,11 +350,60 @@ pub fn update_backs(
     }
 }
 
-pub fn animate_backs(mut ui_backs: Query<(&UiBack, &mut BackgroundColor)>) {
-    for (ui_back, mut back_color) in ui_backs.iter_mut() {
+pub fn animate_backs(
+    mut ui_backs: Query<(&UiBack, &mut BackgroundColor, &mut BorderColor, &mut Node)>,
+    ui_cards: Query<Entity, With<UiCard>>,
+    board: Res<BoardResource>,
+) {
+    assert!(board.player_one_card.is_some());
+    assert!(board.player_two_card.is_some());
+    assert!(!board.card_to_neighbors.is_empty());
+    assert!(!board.card_to_backs.is_empty());
+    assert!(board.card_to_backs.len() == board.card_to_neighbors.len());
+
+    // update colors
+    for (ui_back, mut back_color, mut border_color, _) in ui_backs.iter_mut() {
         let player_index: usize = ui_back.player.clone().into();
-        let (bg_color, _) = PLAYER_COLOR_DATA[player_index].clone();
+        let (bg_color, fg_color) = PLAYER_COLOR_DATA[player_index].clone();
         *back_color = bg_color.into();
+        *border_color = fg_color.into();
+    }
+
+    // update border
+    for ui_card in ui_cards {
+        let ui_back = board.card_to_backs.get(&ui_card).unwrap();
+        let player = ui_backs.get(*ui_back).unwrap().0.player.clone();
+        let next_cards = board.card_to_neighbors.get(&ui_card).unwrap();
+        let check_neighbor = |direction: &Direction| -> Val {
+            if let Some(ui_card_) = next_cards.get(direction) {
+                let ui_back_ = board.card_to_backs.get(&ui_card_).unwrap();
+                let ui_back_ = ui_backs.get(*ui_back_).unwrap().0;
+                if ui_back_.player == player { Val::Px(0.0) } else { Val::Px(2.0) }
+            } else {
+                Val::Px(2.0)
+            }
+        };
+        
+        let top = if ui_card == board.player_one_card.unwrap() {
+            Val::Px(0.0)
+        } else {
+            check_neighbor(&Direction::North)
+        };
+        let bottom = if ui_card == board.player_two_card.unwrap() {
+            Val::Px(0.0)
+        } else {
+            check_neighbor(&Direction::South)
+        };
+        let left = check_neighbor(&Direction::West);
+        let right = check_neighbor(&Direction::East);
+
+        let mut node = ui_backs.get_mut(*ui_back).unwrap().3;
+        node.border = UiRect {
+            top,
+            bottom,
+            left,
+            right,
+        };
     }
 }
 
