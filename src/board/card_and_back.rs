@@ -4,6 +4,7 @@ use super::BoardResource;
 use super::BoardState;
 use super::Player;
 use super::Tile;
+use super::Direction;
 
 use super::player::PLAYER_COLOR_DATA;
 use super::tile::TILE_COLOR_DATA;
@@ -135,18 +136,18 @@ pub fn compute_neighborhoods(
 
     let mut card_to_neighbors = HashMap::new();
     for (ui_card, entity) in ui_cards.iter() {
-        let mut neighbors = HashSet::new();
+        let mut neighbors = HashMap::new();
         if let Some(neighbor) = coord_to_cards.get(&(ui_card.row + 1, ui_card.column)) {
-            neighbors.insert(*neighbor);
+            neighbors.insert(Direction::South, *neighbor);
         }
         if let Some(neighbor) = coord_to_cards.get(&(ui_card.row - 1, ui_card.column)) {
-            neighbors.insert(*neighbor);
+            neighbors.insert(Direction::North,*neighbor);
         }
         if let Some(neighbor) = coord_to_cards.get(&(ui_card.row, ui_card.column + 1)) {
-            neighbors.insert(*neighbor);
+            neighbors.insert(Direction::East, *neighbor);
         }
         if let Some(neighbor) = coord_to_cards.get(&(ui_card.row, ui_card.column - 1)) {
-            neighbors.insert(*neighbor);
+            neighbors.insert(Direction::West, *neighbor);
         }
         card_to_neighbors.insert(entity, neighbors);
     }
@@ -177,7 +178,7 @@ pub fn update_counts_and_playable_tiles(
         let ui_back = ui_backs.get(back_entity).unwrap();
         if let Some(playable_tiles) = player_to_playable_tiles.get_mut(&ui_back.player) {
             assert!(ui_card.tile != Tile::Undef);
-            for card_entity_ in board.card_to_neighbors.get(&card_entity).unwrap() {
+            for (_, card_entity_) in board.card_to_neighbors.get(&card_entity).unwrap().iter() {
                 let card_entity_ = *card_entity_;
                 let back_entity_ = *board.card_to_backs.get(&card_entity_).unwrap();
                 let ui_card_ = ui_cards.get(card_entity_).unwrap().0;
@@ -247,8 +248,7 @@ pub fn play_and_resolve_move(
         while let Some((current_card, current_priority)) = queue.pop() {
             assert!(!done.contains(&current_card));
 
-            let next_cards = board.card_to_neighbors.get(&current_card).unwrap();
-            for next_card in next_cards {
+            for (_, next_card) in board.card_to_neighbors.get(&current_card).unwrap().iter() {
                 if done.contains(next_card) {
                     continue;
                 }
@@ -329,8 +329,7 @@ pub fn update_backs(
         assert!(!done.contains(&current_card));
 
         let current_tile = ui_cards.get(current_card).unwrap().tile.clone();
-        let next_cards = board.card_to_neighbors.get(&current_card).unwrap();
-        for next_card in next_cards {
+        for (_, next_card) in board.card_to_neighbors.get(&current_card).unwrap() {
             if done.contains(next_card) {
                 continue;
             }

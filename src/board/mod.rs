@@ -16,7 +16,6 @@ use tile::Tile;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use bevy::prelude::*;
 
@@ -55,8 +54,8 @@ impl Plugin for BoardPlugin {
         app.init_state::<BoardState>();
 
         app.add_plugins(sound_effect::SoundEffectPlugin);
-        app.add_plugins(debug_label::DebugLabelPlugin);
-        app.add_plugins(main_banner::MainBannerPlugin);
+        app.add_plugins(debug_label::DebugLabelPlugin);     
+        app.add_plugins(main_banner::MainBannerPlugin);        
     }
 }
 
@@ -64,12 +63,20 @@ const BOARD_WIDTH: usize = 14;
 const BOARD_HEIGHT: usize = 7;
 const BOARD_SEED: usize = 0xab28f3af;
 
+#[derive(PartialEq, Eq, Hash)]
+enum Direction {
+    North,
+    South,
+    West,
+    East,
+} 
+
 #[derive(Resource, Default)]
 struct BoardResource {
     player_one_card: Option<Entity>,
     player_two_card: Option<Entity>,
     select_cards: Vec<Entity>,
-    card_to_neighbors: HashMap<Entity, HashSet<Entity>>,
+    card_to_neighbors: HashMap<Entity, HashMap<Direction, Entity>>,
     card_to_backs: HashMap<Entity, Entity>,
     player_to_counts: BTreeMap<Player, usize>,
     player_to_playable_tiles: BTreeMap<Player, BTreeSet<Tile>>,
