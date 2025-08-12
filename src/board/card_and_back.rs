@@ -2,9 +2,9 @@ use bevy::prelude::*;
 
 use super::BoardResource;
 use super::BoardState;
+use super::Direction;
 use super::Player;
 use super::Tile;
-use super::Direction;
 
 use super::BOARD_BLOCK;
 use super::player::PLAYER_COLOR_DATA;
@@ -143,7 +143,7 @@ pub fn compute_neighborhoods(
             neighbors.insert(Direction::South, *neighbor);
         }
         if let Some(neighbor) = coord_to_cards.get(&(ui_card.row - 1, ui_card.column)) {
-            neighbors.insert(Direction::North,*neighbor);
+            neighbors.insert(Direction::North, *neighbor);
         }
         if let Some(neighbor) = coord_to_cards.get(&(ui_card.row, ui_card.column + 1)) {
             neighbors.insert(Direction::East, *neighbor);
@@ -281,7 +281,11 @@ pub fn play_and_resolve_move(
 
         let mut scores: Vec<(Player, usize)> = board.player_to_counts.clone().into_iter().collect();
         scores.sort_by(|aa, bb| aa.1.cmp(&bb.1).reverse());
-        let winning_player = if scores.is_empty() { Player::Undef } else { scores[0].0.clone() };
+        let winning_player = if scores.is_empty() {
+            Player::Undef
+        } else {
+            scores[0].0.clone()
+        };
         board.num_resolved_moves += 1;
         let state =
             if let Some(next_playable_tiles) = board.player_to_playable_tiles.get(&next_player) {
@@ -383,7 +387,11 @@ pub fn animate_backs(
             if let Some(ui_card_) = next_cards.get(direction) {
                 let ui_back_ = board.card_to_backs.get(&ui_card_).unwrap();
                 let ui_back_ = ui_backs.get(*ui_back_).unwrap().0;
-                if ui_back_.player == player { Val::Px(0.0) } else { Val::Px(2.0) }
+                if ui_back_.player == player {
+                    Val::Px(0.0)
+                } else {
+                    Val::Px(2.0)
+                }
             } else {
                 Val::Px(2.0)
             }
