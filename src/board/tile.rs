@@ -1,6 +1,10 @@
 use bevy::color::Srgba;
 use bevy::color::palettes::css::*;
 
+use super::BOARD_HEIGHT;
+use super::BOARD_SEED;
+use super::BOARD_WIDTH;
+
 pub const TILE_COLOR_DATA: &[(Srgba, Srgba, usize)] = &[
     (LIGHT_GREY, BLACK, 26),
     (PINK, RED, 25),
@@ -30,15 +34,31 @@ impl Into<usize> for Tile {
     }
 }
 
-impl From<usize> for Tile {
-    fn from(index: usize) -> Self {
-        match index % TILE_COLOR_DATA.len() {
-            0 => Tile::Undef,
-            1 => Tile::Red,
-            2 => Tile::Green,
-            3 => Tile::Blue,
-            4 => Tile::Yellow,
-            _ => unreachable!(),
+impl Tile {
+    pub fn from_row_and_column(row: usize, column: usize) -> Self {
+        let ii = row * (BOARD_HEIGHT - 1 - row);
+        let jj = column * (BOARD_WIDTH - 1 - column);
+        let mut seed = BOARD_SEED;
+        for _ in 0..16 {
+            seed ^= ii + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            seed ^= jj + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+        if column * 2 < BOARD_WIDTH {
+            match seed % (TILE_COLOR_DATA.len() - 1) {
+                0 => Tile::Red,
+                1 => Tile::Green,
+                2 => Tile::Blue,
+                3 => Tile::Yellow,
+                _ => unreachable!(),
+            }
+        } else {
+            match seed % (TILE_COLOR_DATA.len() - 1) {
+                2 => Tile::Red,
+                3 => Tile::Green,
+                0 => Tile::Blue,
+                1 => Tile::Yellow,
+                _ => unreachable!(),
+            }
         }
     }
 }

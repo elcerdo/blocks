@@ -9,7 +9,6 @@ use super::player_block;
 use super::select_move;
 
 use super::BOARD_HEIGHT;
-use super::BOARD_SEED;
 use super::BOARD_WIDTH;
 
 pub fn populate_board(
@@ -44,7 +43,6 @@ pub fn populate_board(
     });
 
     body_frame.with_children(|parent| {
-        let mut seed = BOARD_SEED;
         player_block::make_pair(
             &texture_crown,
             &atlas_layout_crown,
@@ -63,8 +61,7 @@ pub fn populate_board(
                 })
                 .with_children(|parent| {
                     for column in 0..BOARD_WIDTH {
-                        let tile = Tile::from(seed);
-                        seed ^= 0x9e3779b9 + (seed << 6) + (seed >> 2);
+                        let tile = Tile::from_row_and_column(row, column);
                         let (card_entity, back_entity) = card_and_back::make_pair(
                             &texture_border,
                             &atlas_layout_border,

@@ -131,9 +131,12 @@ fn animate_main(
         BoardState::ResolvingMove(player) => make_colors(player),
         BoardState::Victory(player) => {
             let time = time.elapsed().as_secs_f32();
-            let (bg_color, _) = make_colors(player);
+            let (mut bg_color, _) = make_colors(player);
+            if *player == Player::Undef {
+                bg_color = GRAY_500.into();
+            };
             let strobe = Hsva::new(360.0 * time.fract(), 0.8, 1.0, 1.0);
-            (bg_color.into(), strobe.into())
+            (bg_color, strobe.into())
         }
     };
     *main_banner.0 = bg_color.into();
