@@ -273,18 +273,17 @@ pub fn play_and_resolve_move(
     }
 
     if let BoardState::ResolvingMove(player) = state.get() {
+        let player_one_score = board.player_to_counts.get(&Player::One).unwrap_or(&0);
+        let player_two_score = board.player_to_counts.get(&Player::Two).unwrap_or(&0);
+        let winning_player = match player_one_score.cmp(player_two_score) {
+            Ordering::Less => Player::Two,
+            Ordering::Equal => Player::Undef,
+            Ordering::Greater => Player::Two,
+        };
         let next_player = match player {
             Player::One => Player::Two,
             Player::Two => Player::One,
-            _ => unreachable!(),
-        };
-
-        let mut scores: Vec<(Player, usize)> = board.player_to_counts.clone().into_iter().collect();
-        scores.sort_by(|aa, bb| aa.1.cmp(&bb.1).reverse());
-        let winning_player = if scores.is_empty() {
-            Player::Undef
-        } else {
-            scores[0].0.clone()
+            Player::Undef => unreachable!(),
         };
         board.num_resolved_moves += 1;
         let state =

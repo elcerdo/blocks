@@ -1,10 +1,10 @@
 use bevy::color::palettes::tailwind::*;
 use bevy::prelude::*;
 
+use super::BOARD_BLOCK;
 use super::BoardResource;
 use super::BoardState;
 use super::Player;
-use super::BOARD_BLOCK;
 use super::player::PLAYER_COLOR_DATA;
 
 pub struct MainBannerPlugin;
@@ -104,6 +104,14 @@ fn animate_main(
         };
         format!("{} {}", player, suffix)
     };
+    let make_win_label = |player: &Player| -> String {
+        match player {
+            Player::Undef => "Draw",
+            Player::One => "P1 wins",
+            Player::Two => "P2 wins",
+        }
+        .into()
+    };
     let make_colors = |player: &Player| -> (Color, Color) {
         let index: usize = player.clone().into();
         let (bg_color, fg_color) = PLAYER_COLOR_DATA[index];
@@ -114,7 +122,7 @@ fn animate_main(
         BoardState::WaitingForMove(player) => make_label(player, "turn"),
         BoardState::PlayingMove(player, _) => make_label(player, "turn"),
         BoardState::ResolvingMove(player) => make_label(player, "turn"),
-        BoardState::Victory(player) => make_label(player, "wins"),
+        BoardState::Victory(player) => make_win_label(player),
     };
     let (bg_color, fg_color) = match state {
         BoardState::Init => (BANNER_BG_COLOR.into(), BANNER_FG_COLOR.into()),
